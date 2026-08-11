@@ -1,4 +1,5 @@
 PySide6>=6.5
+numpy>=1.24
 pytest>=7.4
 
 # PySpin (Teledyne FLIR Spinnaker Python bindings) is distributed by the
