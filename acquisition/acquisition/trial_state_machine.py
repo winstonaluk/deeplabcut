@@ -120,6 +120,21 @@ class TrialStateMachine:
     def current_trial_number(self) -> int:
         return self._trial_number
 
+    @property
+    def elapsed_s(self) -> float:
+        """Seconds since the current trial started; 0.0 while IDLE."""
+        if self._phase is not TrialPhase.RECORDING:
+            return 0.0
+        return self._elapsed()
+
+    @property
+    def last_outcome(self) -> TrialOutcome | None:
+        """Non-destructive peek at the most recently completed trial's
+        outcome -- unlike discard_last(), does not clear it. Used by the
+        recording orchestration layer (A6) to build the persisted
+        TrialRecord right after a trial ends."""
+        return self._last_outcome
+
     def request_toggle(self) -> TrialToggleResult:
         """Spacebar handler entry point. Starts a trial from IDLE, stops one
         from RECORDING -- unless within ``min_trial_duration_s`` of trial
