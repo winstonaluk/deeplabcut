@@ -117,3 +117,42 @@ default `capture.fps`) as its own key instead.
 
 **Rework if wrong:** low. Single config key; renaming or removing it later
 touches only `QCConfig` and `qc_gate.py`'s one comparison.
+
+---
+
+## B5 · report-stage-cannot-group-by-animal
+
+**File:** `analysis/pipeline/stages/report.py`
+
+**Decision faced:** Stage 9's contract says "Group-level aggregation,
+statistics, figures. Reads only trial_summary.parquet and
+kinematics_long.parquet." But `TrialSummaryRow` and `KinematicsLongRow`
+(both defined at B1) carry `trial_uid` and `primary_keypoint`/`keypoint`,
+not `animal_id`/`project_name` -- so report cannot group by animal or
+project without either (a) parsing those fields back out of `trial_uid`'s
+compound string, or (b) reading manifest_qc.parquet too, which the stated
+contract excludes.
+
+**Options considered:**
+1. Parse `trial_uid` (format `{animal_id}_{project_name}_{date}_{initials}_
+   {view}_t{trial_number:03d}`, from `manifest.py`'s `trial_uid()`) back
+   into fields via string splitting.
+2. Only build grouping that's possible from the declared inputs as-is
+   (by `primary_keypoint`, and an overall/ungrouped summary), and leave
+   animal/project grouping as something the caller does by joining against
+   the manifest separately before calling into this module.
+
+**Chosen:** (2). `trial_uid` parsing is fragile: animal_id, project_name,
+and initials are all free-ish text that can themselves contain
+underscores, so splitting the compound string back into fields is
+ambiguous in general, not just an edge case. Building `aggregate_overall()`
+and `aggregate_by_keypoint()` against exactly what's in the declared
+inputs, and leaving per-animal grouping to whoever has both the manifest
+and the trial summary in hand, avoids a parser that would silently misparse
+some fraction of real animal IDs.
+
+**Rework if wrong:** low-medium. If animal-level grouping needs to live
+inside this module later, the clean fix is adding `animal_id`/
+`project_name` columns to `TrialSummaryRow` itself (populated once, when
+the row is created from a `ManifestRow` + kinematics result) rather than
+reconstructing them downstream -- an additive schema change, not a rewrite.

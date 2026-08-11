@@ -271,6 +271,7 @@ def occlusion_fraction(likelihood: np.ndarray, cutoff: float) -> float:
 @dataclass(frozen=True)
 class TrialKinematicsResult:
     height_mm: np.ndarray  # y(t) -- the pipeline's product
+    height_frac: np.ndarray
     perpendicular_mm: np.ndarray
     velocity_mm_s: np.ndarray  # v(t)
     likelihood: np.ndarray
@@ -329,6 +330,7 @@ def compute_trial_kinematics(
 
     return TrialKinematicsResult(
         height_mm=height_mm,
+        height_frac=frac,
         perpendicular_mm=perpendicular_mm,
         velocity_mm_s=velocity_mm_s,
         likelihood=np.asarray(likelihood, dtype=float),
@@ -366,6 +368,8 @@ def to_kinematics_long_rows(
             frame_index=i,
             x_mm=float(result.perpendicular_mm[i]),
             y_mm=float(result.height_mm[i]),
+            height_fraction=float(result.height_frac[i]),
+            velocity_mm_s=float(result.velocity_mm_s[i]),
             likelihood=float(result.likelihood[i]),
             is_interpolated=bool(result.is_interpolated[i]),
         )

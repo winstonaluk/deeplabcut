@@ -83,7 +83,8 @@ def test_pose_index_row_constructs():
 def test_kinematics_long_row_constructs():
     row = KinematicsLongRow(
         trial_uid="uid", view="lateral_L", keypoint="mid_back", frame_index=5,
-        x_mm=12.3, y_mm=456.7, likelihood=0.92, is_interpolated=False,
+        x_mm=12.3, y_mm=456.7, height_fraction=0.4567, velocity_mm_s=-500.0,
+        likelihood=0.92, is_interpolated=False,
     )
     assert row.is_interpolated is False
 

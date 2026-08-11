@@ -115,7 +115,14 @@ class PoseIndexRow:
 @dataclass(frozen=True)
 class KinematicsLongRow:
     """Stage 8 (kinematics, B4) output: kinematics_long.parquet -- one row
-    per frame x trial x view x keypoint (long/tidy, invariant 10)."""
+    per frame x trial x view x keypoint (long/tidy, invariant 10).
+
+    Carries height_fraction and velocity_mm_s (not just position) so stage 9
+    can aggregate velocity-by-height across trials without recomputing
+    derivatives from pooled, cross-trial-boundary position data -- report's
+    contract is "reads only trial_summary.parquet and kinematics_long.parquet",
+    so anything it needs must already be a column here.
+    """
 
     trial_uid: str
     view: str
@@ -123,6 +130,8 @@ class KinematicsLongRow:
     frame_index: int
     x_mm: float
     y_mm: float
+    height_fraction: float
+    velocity_mm_s: float
     likelihood: float
     is_interpolated: bool
 
