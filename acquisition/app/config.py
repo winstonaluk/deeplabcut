@@ -26,6 +26,8 @@ class CameraConfig:
 @dataclass(frozen=True)
 class CaptureConfig:
     fps: int
+    width: int
+    height: int
     queue_maxsize: int
     preview_fps: int
     preroll_buffer_s: float

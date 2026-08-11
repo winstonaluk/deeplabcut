@@ -16,6 +16,8 @@ user_set = "UserSet1"
 
 [capture]
 fps = 30
+width = 1280
+height = 720
 queue_maxsize = 120
 preview_fps = 15
 preroll_buffer_s = 2.0
