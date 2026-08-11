@@ -11,22 +11,13 @@ from dataclasses import dataclass
 from pathlib import Path
 
 from acquisition.camera_backend import CameraBackend, CameraError
+from storage.disk import free_space_gb
 
 
 @dataclass(frozen=True)
 class PreflightResult:
     passed: bool
     failures: tuple[str, ...]
-
-
-def _existing_ancestor(path: Path) -> Path:
-    path = Path(path)
-    while not path.exists():
-        parent = path.parent
-        if parent == path:
-            raise FileNotFoundError(f"no existing ancestor for {path}")
-        path = parent
-    return path
 
 
 def run_preflight_checks(
@@ -51,7 +42,7 @@ def run_preflight_checks(
     if shutil.which("ffmpeg") is None:
         failures.append("FFmpeg not found on PATH")
 
-    free_gb = shutil.disk_usage(_existing_ancestor(Path(session_root))).free / 1e9
+    free_gb = free_space_gb(Path(session_root))
     if free_gb < min_free_gb:
         failures.append(
             f"Free disk space ({free_gb:.1f} GB) is below the {min_free_gb} GB threshold"
