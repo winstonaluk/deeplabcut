@@ -1,0 +1,7 @@
+PySide6>=6.5
+pytest>=7.4
+
+# PySpin (Teledyne FLIR Spinnaker Python bindings) is distributed by the
+# vendor, not on PyPI. Install the wheel matching your Python/OS from the
+# Spinnaker SDK download after installing the SDK itself. Only required for
+# SpinnakerCamera (A9) / real hardware; MockCamera and all tests run without it.

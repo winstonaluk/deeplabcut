@@ -1,0 +1,11 @@
+numpy>=1.24
+pandas>=2.0
+pyarrow>=14.0
+scipy>=1.10
+pytest>=7.4
+
+# DeepLabCut 3.0 (PyTorch engine) and torch are intentionally excluded here:
+# stages 3/5/6/7 (B7) are scaffolded, not implemented, and installing DLC/torch
+# is not required to run the buildable-unattended checkpoints (B1-B6). On the
+# analysis PC (RTX 5070 Ti, Blackwell/sm_120) torch must come from the cu128
+# index-url per analysis/CLAUDE.md — do not `pip install torch` plain.
