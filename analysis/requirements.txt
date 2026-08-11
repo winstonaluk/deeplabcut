@@ -2,6 +2,7 @@ numpy>=1.24
 pandas>=2.0
 pyarrow>=14.0
 scipy>=1.10
+opencv-python-headless>=4.9  # coordinate undistortion only (invariant 2) -- never touches video
 pytest>=7.4
 
 # DeepLabCut 3.0 (PyTorch engine) and torch are intentionally excluded here:
