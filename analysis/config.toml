@@ -1,0 +1,72 @@
+# Analysis pipeline configuration. Every threshold, path, keypoint scheme,
+# and filter parameter used by the pipeline reaches code through this file
+# -- see analysis/CLAUDE.md invariant 6 ("Config is the single source of
+# truth").
+
+[paths]
+archive_root = "./archive"        # CRSP or equivalent: raw video, write-once
+local_cache_root = "./cache"      # transient, sized for one inference batch
+derived_root = "./derived"        # manifest, pose .h5, kinematics, reports
+dlc_project_path = "./dlc_project"
+
+[views]
+# Camera/view list. One entry today; Anipose triangulation (future) inserts
+# between stages 7 and 8 without this list changing shape.
+list = ["lateral_L"]
+
+[keypoints]
+# Single source of truth for the labeling scheme (invariant 8). Must include
+# static pole landmarks alongside animal keypoints.
+scheme = ["snout", "mid_back", "tail_base", "pole_top", "pole_base", "fiducial"]
+pole_landmarks = ["pole_top", "pole_base", "fiducial"]
+# primary_keypoint is a config parameter, never hardcoded (invariant 8):
+# y(t) must regenerate for any labelled keypoint without re-labelling.
+primary_keypoint = "mid_back"
+
+[superanimal_init]
+# Per-view SuperAnimal init, decided by zero-shot comparison, not assumption
+# (analysis/CLAUDE.md "Open decisions"). Placeholder until that comparison runs.
+lateral_L = "SuperAnimal-Quadruped"
+
+[qc]
+# Stage 1 qc_gate thresholds. All config, none hardcoded (invariant 6).
+max_dropped_frame_rate = 0.02
+min_duration_s = 5.0
+max_duration_s = 600.0
+max_fps_deviation = 2.0
+
+[pole]
+length_mm = 1000.0
+
+[kinematics]
+likelihood_cutoff = 0.6
+max_gap_frames = 5
+smoothing_method = "median"
+smoothing_window = 5
+# The descent onset/offset rule is named and versioned (invariant 7):
+# changing it changes the config hash and regenerates downstream artifacts.
+descent_rule_name = "threshold_crossing_v1"
+descent_rule_onset_height_fraction = 0.95
+descent_rule_offset_height_fraction = 0.05
+pole_landmark_drift_threshold_mm = 5.0
+
+[evaluation]
+max_pixel_error = 10.0
+
+[analysis]
+# Decoupled from acquisition frame rate (invariant 12); any downsampling is
+# an explicit, logged config choice, not implicit.
+fps = 30
+
+[inference]
+batch_size = 8
+
+[[calibration_epochs]]
+# A calibration is valid until the camera is moved/refocused; manifest rows
+# map to an epoch by date range. Placeholder single epoch for the one camera
+# in service today.
+camera_serial = "REPLACE_WITH_CAMERA_SERIAL"
+epoch_id = "epoch-2026-01"
+start_date = "20260101"
+end_date = "99991231"
+calibration_path = "./calibration/REPLACE_WITH_CAMERA_SERIAL_epoch-2026-01.json"

@@ -54,3 +54,37 @@ match what a real pose-driven condition eventually needs to express.
 distinguish predicate-triggered stops in `trials.csv`/`auto_flags`, this is
 a one-line addition in `_finalize_trial`'s caller in `tick()`, not a schema
 change (the `auto_flags` field is an open string set already).
+
+---
+
+## B1 · stage-2-calibration-has-no-checkpoint
+
+**File:** `analysis/CLAUDE.md` checkpoint table; `analysis/pipeline/contracts.py`
+
+**Decision faced:** Stage 8 (`kinematics`, checkpoint B4) requires camera
+intrinsics to undistort coordinates (invariant 2). Those intrinsics come
+from stage 2 (`calibration`), described in the "Stage contracts" section --
+but stage 2 is not assigned to any of B1-B7, and `calibration` is not one of
+the `python -m pipeline` subcommands listed under "Commands" either. Every
+other stage in the contract table maps to a checkpoint (0->B2, 1->B3,
+3/5/6/7->B7, 8->B4, 9->B5) or is explicitly manual (4, labeling); 2 is the
+one gap.
+
+**Options considered:**
+1. Build the calibration stage anyway (checkerboard corner detection via
+   `cv2.calibrateCamera`) since B4 needs its output.
+2. Treat it as out of scope for this run, and have B4's kinematics stage
+   accept calibration parameters (camera matrix + distortion coefficients)
+   as an explicit input/argument rather than computing them.
+
+**Chosen:** (2). Building an unassigned stage is scope expansion the
+overnight-prompt.md instructions explicitly warn against ("do not expand
+scope... however small it seems"), and checkerboard calibration inherently
+needs real calibration images -- there's no synthetic-data path for it the
+way B4's kinematics core has one, so it wouldn't be unattended-buildable
+even if in scope. `contracts.py`'s `CalibrationRecord` defines the data
+shape so B4 and a future calibration stage share one contract.
+
+**Rework if wrong:** low. `CalibrationRecord`'s shape (camera matrix +
+distortion coefficients) is the standard OpenCV pinhole model; a real
+calibration stage that populates it later is additive, not a rewrite of B4.
