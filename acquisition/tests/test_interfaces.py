@@ -64,16 +64,12 @@ def test_keypress_stop_condition_flag_semantics():
     assert condition.should_stop() is False
 
 
-def test_trial_state_machine_starts_idle_and_guards_are_not_yet_implemented():
+def test_trial_state_machine_starts_idle():
     config = TrialTimingConfig(min_trial_duration_s=5, suspicious_duration_s=30, max_trial_duration_s=600)
     machine = TrialStateMachine(config=config, stop_condition=KeypressStopCondition(), clock=lambda: 0.0)
 
     assert machine.phase is TrialPhase.IDLE
     assert machine.current_trial_number == 0
-
-    with pytest.raises(NotImplementedError):
-        machine.request_toggle()
-    with pytest.raises(NotImplementedError):
-        machine.tick()
-    with pytest.raises(NotImplementedError):
-        machine.discard_last()
+    # Guard behavior (min-duration swallow, max-duration auto-stop,
+    # suspicious-short auto-flag, discard-last) is covered in depth by
+    # test_trial_state_machine.py (checkpoint A3).

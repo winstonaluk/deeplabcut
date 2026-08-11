@@ -1,8 +1,7 @@
 """IDLE -> RECORDING -> IDLE trial state machine.
 
-Guards (min-duration swallow, suspicious-short auto-flag, max-duration
-auto-stop) are implemented at checkpoint A3. This module defines the shape
-only: phases, the stop-condition seam, and the controller's public API.
+Guards: min-duration swallow, suspicious-short auto-flag, max-duration
+auto-stop, discard-last (acquisition/CLAUDE.md "Trial state machine").
 
 Stop condition is a pluggable predicate (invariant 8) so a future pose-driven
 paradigm can replace ``KeypressStopCondition`` without the GUI's spacebar
@@ -124,16 +123,74 @@ class TrialStateMachine:
     def request_toggle(self) -> TrialToggleResult:
         """Spacebar handler entry point. Starts a trial from IDLE, stops one
         from RECORDING -- unless within ``min_trial_duration_s`` of trial
-        start, in which case the press is swallowed entirely (A3).
+        start, in which case the press is swallowed entirely.
         """
-        raise NotImplementedError("state machine guards implemented at checkpoint A3")
+        if self._phase is TrialPhase.IDLE:
+            self._trial_number += 1
+            self._trial_start_time = self._clock()
+            self._phase = TrialPhase.RECORDING
+            return TrialToggleResult(TrialToggleAction.STARTED, self._trial_number)
+
+        elapsed = self._elapsed()
+        if elapsed < self._config.min_trial_duration_s:
+            return TrialToggleResult(TrialToggleAction.SWALLOWED_MIN_DURATION, self._trial_number)
+
+        self._finalize_trial(extra_auto_flags=frozenset())
+        return TrialToggleResult(TrialToggleAction.STOPPED, self._trial_number)
 
     def tick(self) -> None:
-        """Periodic check for max-duration auto-stop and stop_condition.should_stop() (A3)."""
-        raise NotImplementedError("state machine guards implemented at checkpoint A3")
+        """Periodic check (e.g. a Qt timer) for max-duration auto-stop and
+        stop_condition.should_stop(). No-op outside RECORDING.
+
+        # TODO(QUESTIONS.md): trial-state-machine-min-duration-vs-predicate
+        A predicate-triggered stop is still subject to min_trial_duration_s,
+        same as a manual spacebar stop -- most conservative reading, since
+        CLAUDE.md ties the guard to "double-tap zero-length trials" without
+        saying whether it should also gate a future pose-driven stop.
+        """
+        if self._phase is not TrialPhase.RECORDING:
+            return
+
+        elapsed = self._elapsed()
+        if elapsed >= self._config.max_trial_duration_s:
+            self._finalize_trial(extra_auto_flags=frozenset({"max_duration_reached"}))
+            return
+
+        if elapsed >= self._config.min_trial_duration_s and self._stop_condition.should_stop():
+            self._finalize_trial(extra_auto_flags=frozenset())
 
     def discard_last(self) -> TrialOutcome | None:
         """Ctrl+Delete handler: discards the last completed trial after
-        confirmation is handled by the caller. Decrements the trial counter (A3).
+        confirmation is handled by the caller. Decrements the trial counter.
+
+        Only removes this state machine's bookkeeping (the outcome record and
+        the counter) -- deleting the video/sidecar/metadata files is the
+        caller's job (storage layer), keeping recording integrity independent
+        of this class (invariant 4).
         """
-        raise NotImplementedError("discard-last implemented at checkpoint A3")
+        if self._last_outcome is None:
+            return None
+        outcome = self._last_outcome
+        self._last_outcome = None
+        self._trial_number -= 1
+        return outcome
+
+    def _elapsed(self) -> float:
+        assert self._trial_start_time is not None
+        return self._clock() - self._trial_start_time
+
+    def _finalize_trial(self, extra_auto_flags: frozenset[str]) -> TrialOutcome:
+        duration = self._elapsed()
+        auto_flags = set(extra_auto_flags)
+        if duration < self._config.suspicious_duration_s:
+            auto_flags.add("suspiciously_short")
+        outcome = TrialOutcome(
+            trial_number=self._trial_number,
+            start_time=self._trial_start_time,  # type: ignore[arg-type]
+            duration_s=duration,
+            auto_flags=frozenset(auto_flags),
+        )
+        self._last_outcome = outcome
+        self._phase = TrialPhase.IDLE
+        self._trial_start_time = None
+        return outcome
