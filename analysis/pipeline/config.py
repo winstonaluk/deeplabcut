@@ -33,6 +33,7 @@ class KeypointsConfig:
 
 @dataclass(frozen=True)
 class QCConfig:
+    nominal_fps: float
     max_dropped_frame_rate: float
     min_duration_s: float
     max_duration_s: float

@@ -30,6 +30,11 @@ lateral_L = "SuperAnimal-Quadruped"
 
 [qc]
 # Stage 1 qc_gate thresholds. All config, none hardcoded (invariant 6).
+# nominal_fps is what the camera was configured to capture at (acquisition
+# config.toml capture.fps) -- deliberately NOT analysis.fps below, which is
+# about post-hoc downsampling for kinematics and is a different concept
+# entirely (invariant 12). See QUESTIONS.md b3-qc-nominal-fps.
+nominal_fps = 30.0
 max_dropped_frame_rate = 0.02
 min_duration_s = 5.0
 max_duration_s = 600.0

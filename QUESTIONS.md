@@ -88,3 +88,32 @@ shape so B4 and a future calibration stage share one contract.
 **Rework if wrong:** low. `CalibrationRecord`'s shape (camera matrix +
 distortion coefficients) is the standard OpenCV pinhole model; a real
 calibration stage that populates it later is additive, not a rewrite of B4.
+
+---
+
+## B3 · qc-nominal-fps
+
+**File:** `analysis/config.toml` `[qc]`, `analysis/pipeline/config.py` `QCConfig`
+
+**Decision faced:** The QC gate's "achieved_fps deviating from nominal ->
+exclude" rule (analysis/CLAUDE.md stage 1 contract) needs a nominal fps to
+compare against, but "Config keys" only lists "fps deviation" (i.e. the
+threshold) under QC thresholds -- no key holding the nominal value itself.
+`analysis.fps` exists but is explicitly about post-hoc downsampling for
+kinematics (invariant 12: "Analysis frame rate is decoupled from
+acquisition frame rate"), a different concept from what the camera was
+actually configured to capture at.
+
+**Options considered:**
+1. Reuse `analysis.fps` as the QC nominal-fps comparison value.
+2. Add a new `qc.nominal_fps` key, separate from `analysis.fps`.
+
+**Chosen:** (2). Reusing `analysis.fps` would silently couple two concepts
+invariant 12 explicitly says must stay decoupled -- if someone sets
+`analysis.fps` to downsample kinematics, every trial would suddenly fail QC
+for "fps deviation" even though nothing about the actual capture changed.
+Added `qc.nominal_fps` (default 30.0, matching acquisition's config.toml
+default `capture.fps`) as its own key instead.
+
+**Rework if wrong:** low. Single config key; renaming or removing it later
+touches only `QCConfig` and `qc_gate.py`'s one comparison.
