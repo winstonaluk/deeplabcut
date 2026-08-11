@@ -156,3 +156,39 @@ inside this module later, the clean fix is adding `animal_id`/
 `project_name` columns to `TrialSummaryRow` itself (populated once, when
 the row is created from a `ManifestRow` + kinematics result) rather than
 reconstructing them downstream -- an additive schema change, not a rewrite.
+
+---
+
+## B6 · kinematics-cli-stage-not-wired
+
+**File:** `analysis/pipeline/orchestration.py`
+
+**Decision faced:** B6 ("Per-stage commands") is checkpointed *before* B7
+(stages 3/5/6/7, including `infer`, which produces stage 7's pose `.h5`
+output). But `kinematics` (stage 8, B4) needs pose data as input, and B4 is
+checkpointed *before* B6 too -- so at every point in the prescribed build
+order, there is no real (or even placeholder) source of pose data for a
+`python -m pipeline kinematics` command to read. B4's own checkpoint scope
+was explicitly "the pure pipeline as testable functions" operating on
+in-memory arrays, not a file-reading stage runner.
+
+**Options considered:**
+1. Fabricate a synthetic DLC-shaped `.h5` pose file (pandas
+   MultiIndex-column format DLC uses) purely for testing, and write a real
+   `kinematics` stage runner against that format now.
+2. Register `kinematics` in the CLI/orchestration layer as present but not
+   implemented (same as `extract`/`train`/`evaluate`/`infer`), leaving the
+   file-I/O wiring for whenever stage 7's real output format is settled.
+
+**Chosen:** (2). Option 1 would mean inventing stage 7's output contract
+under time pressure specifically to unblock stage 8's CLI wiring, then
+potentially having to redo that contract once B7's actual scaffold (or a
+future real implementation) settles on a shape -- speculative plumbing
+built to satisfy a checkpoint rather than a real requirement. `kinematics`'s
+pure computational core (B4) is fully built and tested regardless; only its
+CLI-level file-reading wrapper is deferred, for the same structural reason
+B7's stages are scaffold-only.
+
+**Rework if wrong:** low. Wiring `kinematics` into `STAGE_REGISTRY` later
+is additive -- one more `Stage(...)` entry calling into B4's already-tested
+`compute_trial_kinematics()`, not a change to anything already built.

@@ -27,4 +27,6 @@ Thumbs.db
 
 # Analysis derived artifacts
 /analysis/cache/
+/analysis/derived/
+/analysis/archive/
 *.parquet.tmp
