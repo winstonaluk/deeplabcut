@@ -67,6 +67,26 @@ class EncoderConfig:
     fallback_codec: str
     crf: int
     pixel_format: str
+    qsv_global_quality: int | None = None
+    preset: str = "slow"
+    qsv_preset: str = "slower"
+    keyframe_interval_s: float = 4.0
+
+    def quality_for(self, codec: str) -> tuple[str, int]:
+        """The right quality flag and value for ``codec``.
+
+        libx264's -crf and QSV's -global_quality are different scales, so a
+        single shared number means two different qualities depending on which
+        encoder resolved at run time. ``qsv_global_quality`` falls back to
+        ``crf`` only so an older config.toml keeps working.
+        """
+        if codec.endswith("_qsv"):
+            value = self.qsv_global_quality if self.qsv_global_quality is not None else self.crf
+            return ("-global_quality", value)
+        return ("-crf", self.crf)
+
+    def preset_for(self, codec: str) -> str:
+        return self.qsv_preset if codec.endswith("_qsv") else self.preset
 
 
 @dataclass(frozen=True)

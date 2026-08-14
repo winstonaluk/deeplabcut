@@ -39,7 +39,33 @@ pixel_format = "mono8"
 [encoder]
 codec = "h264_qsv"
 fallback_codec = "libx264"
-crf = 18
+
+# Quality is per-codec because the two scales are NOT interchangeable. libx264
+# takes -crf; h264_qsv takes -global_quality, whose numbers mean something
+# different for the same visual result. One shared value silently produced two
+# different qualities depending on which encoder resolved.
+#
+# Lower = better quality and bigger files, on both scales. These are starting
+# points, not measurements -- run tools/measure_encoder.py against real footage
+# and set them from the results. See "Encoder tuning" in CLAUDE.md.
+crf = 20
+qsv_global_quality = 22
+
+# Compression effort. Slower presets mean smaller files at the same quality,
+# paid for in CPU. At 720x540/30fps the frames are small, so there is real
+# headroom here -- but the writer must sustain throughput without dropping
+# frames, so verify before raising it.
+preset = "slow"
+qsv_preset = "slower"
+
+# Seconds between keyframes. DLC decodes sequentially, so long GOPs are cheap
+# for us and save meaningful space. Shorten only if you need to scrub.
+keyframe_interval_s = 4
+
+# yuv420p rather than gray: the chroma planes are constant on Mono8 input, so
+# H.264 compresses them to almost nothing, and it keeps the files readable by
+# every downstream tool. Monochrome H.264 (gray) saves little and is handled
+# inconsistently by decoders -- not worth the interop risk for DLC input.
 pixel_format = "yuv420p"
 
 [camera_verify]

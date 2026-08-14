@@ -198,16 +198,21 @@ class RecordingSessionController:
             # preflight has already blocked the session if they disagree, so
             # this is the same value with the hardware as its authority.
             width, height = rig.controller.resolution
+            encoder = self._config.encoder
+            quality_flag, quality_value = encoder.quality_for(encoder.codec)
             writer = WriterThread(
                 frame_queue=queue,
                 output_path=self._session_dir / self._video_filename(rig, wall_start, trial_number),
                 width=width,
                 height=height,
                 fps=self._config.capture.fps,
-                codec=self._config.encoder.codec,
-                crf=self._config.encoder.crf,
-                pixel_format=self._config.encoder.pixel_format,
+                codec=encoder.codec,
+                crf=quality_value,
+                pixel_format=encoder.pixel_format,
                 source_pixel_format=rig.controller.pixel_format,
+                quality_flag=quality_flag,
+                preset=encoder.preset_for(encoder.codec),
+                gop=max(1, round(encoder.keyframe_interval_s * self._config.capture.fps)),
                 preroll_frames=preroll_frames,
             )
             writer.start()

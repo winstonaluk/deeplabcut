@@ -297,6 +297,61 @@ def test_camera_verify_pixel_format_agrees_with_capture_pixel_format():
     )
 
 
+def test_qsv_and_x264_get_their_own_quality_scale():
+    """-crf and -global_quality are different scales. One shared number meant
+    two different qualities depending on which encoder resolved at run time."""
+    from app.config import EncoderConfig
+
+    encoder = EncoderConfig(
+        codec="h264_qsv", fallback_codec="libx264",
+        crf=20, qsv_global_quality=22, pixel_format="yuv420p",
+    )
+    assert encoder.quality_for("h264_qsv") == ("-global_quality", 22)
+    assert encoder.quality_for("libx264") == ("-crf", 20)
+    assert encoder.preset_for("h264_qsv") == encoder.qsv_preset
+    assert encoder.preset_for("libx264") == encoder.preset
+
+
+def test_qsv_quality_falls_back_to_crf_when_unset():
+    """So a config.toml written before the split still loads."""
+    from app.config import EncoderConfig
+
+    encoder = EncoderConfig(
+        codec="h264_qsv", fallback_codec="libx264", crf=18, pixel_format="yuv420p",
+    )
+    assert encoder.quality_for("h264_qsv") == ("-global_quality", 18)
+
+
+@pytest.mark.parametrize(
+    "codec,flag", [("h264_qsv", "-global_quality"), ("libx264", "-crf")]
+)
+def test_writer_command_carries_the_right_quality_flag(tmp_path, codec, flag):
+    from acquisition.frame_queue import BoundedFrameQueue
+
+    writer = WriterThread(
+        frame_queue=BoundedFrameQueue(maxsize=4),
+        output_path=tmp_path / "out.mp4",
+        width=720, height=540, fps=30,
+        codec=codec, crf=21, pixel_format="yuv420p",
+        preset="slow", gop=120,
+    )
+    cmd = writer.build_command()
+    assert cmd[cmd.index("-c:v") + 1] == codec
+    assert cmd[cmd.index(flag) + 1] == "21"
+    assert cmd[cmd.index("-preset") + 1] == "slow"
+    assert cmd[cmd.index("-g") + 1] == "120"
+    # Raw input geometry must describe the frames, not the output.
+    assert cmd[cmd.index("-video_size") + 1] == "720x540"
+    assert cmd[cmd.index("-pixel_format") + 1] == "gray8"
+    assert cmd[cmd.index("-pix_fmt") + 1] == "yuv420p"
+
+
+def test_keyframe_interval_becomes_a_gop_in_frames():
+    config = load_config(CONFIG_PATH)
+    gop = round(config.encoder.keyframe_interval_s * config.capture.fps)
+    assert gop == 120  # 4 s at 30 fps
+
+
 def test_config_rejects_an_unknown_pixel_format():
     from app.config import CaptureConfig, ConfigError
 

@@ -45,7 +45,9 @@ These facts drive design decisions — don't optimize against them.
   make a trial noisy — they make it meaningless. Exclusion metadata is
   scientifically load-bearing.
 - Video becomes DLC training data. Compression artifacts degrade keypoint
-  accuracy; do not trade quality for file size.
+  accuracy. **Minimise file size subject to keypoint accuracy, in that order** —
+  quality is the constraint, size is the thing being optimised, and neither is
+  free. See "Encoder tuning" below; do not guess at the trade-off, measure it.
 
 ## Hardware
 
@@ -248,11 +250,48 @@ convenience.
 - Live free-space indicator **and estimated remaining-recording-time** from
   measured bitrate. GB free is not actionable mid-session; "47 min remaining" is.
 - Hard block on session start below threshold, surfaced as a clear preflight failure.
-- `h264_qsv` at CRF ~18 (config), fallback `libx264`.
+- `h264_qsv` primary, fallback `libx264`. Quality is configured **per codec** —
+  `-crf` and `-global_quality` are different scales and a shared number gives
+  two different qualities depending on which encoder resolved.
 - "Stage for transfer": package completed sessions to a staging dir with checksum
   verification. Remote is a **generic mounted path / rsync / robocopy target** —
   never hardcode an institution-specific system.
 - Purge-after-verified-transfer requires explicit confirmation.
+
+## Encoder tuning
+
+Goal: smallest files that still support accurate DLC keypoints. The levers, in
+descending order of how much they actually matter:
+
+1. **Exposure time — not a codec setting at all.** The camera was found at
+   15 ms exposure. A rat descending a pole moves visibly within 15 ms, and that
+   motion blur destroys keypoint precision in a way no encoder setting can
+   recover, and no bitrate can compensate for. **Shorten exposure (single-digit
+   ms) and pay for it with light and gain, not with CRF.** Blur also makes
+   frames *harder* to compress, so this is the rare change that improves
+   quality and size together. Set it in SpinView, save to `UserSet1`.
+2. **Resolution.** 720 × 540 is already the full sensor; there is nothing to
+   give back here without cropping to an ROI. If the animal occupies a
+   predictable part of the frame, an ROI in `UserSet1` is the single largest
+   size saving available — and it raises the achievable frame rate too.
+3. **Quality (`crf` / `qsv_global_quality`).** The obvious knob and the one to
+   tune last, from measurement.
+4. **Preset.** Slower presets are strictly better bytes-per-quality, paid in
+   CPU. Free quality if the writer keeps up.
+5. **Codec choice.** `h264_qsv` is fixed-function: fast, near-zero CPU, and
+   less efficient per bit than `libx264` at a slow preset. At 720 × 540 / 30 fps
+   the software encoder may well keep up on the i7-7700 and produce smaller
+   files — worth measuring before assuming Quick Sync is the right default.
+   Whichever wins, the writer must sustain throughput with no dropped frames.
+
+**Measure, don't guess:** `python tools/measure_encoder.py REFERENCE.mp4` sweeps
+codec × quality × preset over one real trial and reports size and SSIM. Use real
+footage with an animal moving; a static clip flatters every setting equally.
+SSIM is a proxy — confirm the winner by labelling a few frames from it, since
+keypoint accuracy is the actual criterion and no full-frame metric measures it.
+
+30 fps is ample for PDCT descent kinematics. Raising it costs size linearly and
+buys nothing for this paradigm; it is a config value if a future one needs it.
 
 ## Preflight checks
 
@@ -299,6 +338,9 @@ pytest
 
 # read the camera and refresh HARDWARE.md (acquisition PC only; needs PySpin)
 python tools/probe_camera.py
+
+# sweep encoder settings over a real trial; needs FFmpeg
+python tools/measure_encoder.py REFERENCE.mp4
 ```
 
 Tests that spawn FFmpeg are marked `requires_ffmpeg` and skip automatically when

@@ -38,6 +38,9 @@ class WriterThread(threading.Thread):
         crf: int,
         pixel_format: str,
         source_pixel_format: PixelFormat = PixelFormat.MONO8,
+        quality_flag: str | None = None,
+        preset: str | None = None,
+        gop: int | None = None,
         preroll_frames: list[Frame] | None = None,
         poll_timeout_s: float = 0.5,
     ) -> None:
@@ -51,6 +54,9 @@ class WriterThread(threading.Thread):
         self._crf = crf
         self._pixel_format = pixel_format
         self._source_pixel_format = source_pixel_format
+        self._quality_flag = quality_flag
+        self._preset = preset
+        self._gop = gop
         self._preroll_frames = list(preroll_frames or [])
         self._poll_timeout_s = poll_timeout_s
 
@@ -90,12 +96,21 @@ class WriterThread(threading.Thread):
                 f"ffmpeg exited {self._returncode} writing {self._output_path}: {self._stderr_tail}"
             )
 
-    def run(self) -> None:
-        self._output_path.parent.mkdir(parents=True, exist_ok=True)
-        # QSV encoders don't accept -crf (that's a libx264-family option) and
-        # use a different quality knob; reusing the same config value keeps
-        # config.toml's single "crf" key meaningful for either codec.
-        quality_flag = "-global_quality" if self._codec.endswith("_qsv") else "-crf"
+    def build_command(self) -> list[str]:
+        """The FFmpeg invocation for this trial.
+
+        Separated from :meth:`run` so it is assertable in tests without
+        spawning a process -- the flags here decide both recording quality and
+        file size, and getting one of them silently wrong (a QSV encoder handed
+        an x264 quality scale, say) is not visible until you compare footage.
+        """
+        # QSV takes -global_quality, the x264 family takes -crf, and the two
+        # scales are not interchangeable. The caller normally supplies the
+        # right flag from EncoderConfig.quality_for(); this derivation is the
+        # fallback for callers that don't.
+        quality_flag = self._quality_flag or (
+            "-global_quality" if self._codec.endswith("_qsv") else "-crf"
+        )
         cmd = [
             "ffmpeg", "-hide_banner", "-loglevel", "error", "-y",
             "-f", "rawvideo",
@@ -108,9 +123,17 @@ class WriterThread(threading.Thread):
             "-i", "-",
             "-c:v", self._codec,
             quality_flag, str(self._crf),
-            "-pix_fmt", self._pixel_format,
-            str(self._output_path),
         ]
+        if self._preset:
+            cmd += ["-preset", self._preset]
+        if self._gop:
+            cmd += ["-g", str(self._gop)]
+        cmd += ["-pix_fmt", self._pixel_format, str(self._output_path)]
+        return cmd
+
+    def run(self) -> None:
+        self._output_path.parent.mkdir(parents=True, exist_ok=True)
+        cmd = self.build_command()
         try:
             self._process = subprocess.Popen(cmd, stdin=subprocess.PIPE, stderr=subprocess.PIPE)
             assert self._process.stdin is not None

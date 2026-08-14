@@ -140,6 +140,28 @@ Worth doing deliberately, as its own change, alongside the analysis repo.
 
 ---
 
+## A9.5 · encoder-quality-scales-were-shared — RESOLVED
+
+**File:** `acquisition/config.toml` `[encoder]`, `acquisition/app/config.py`
+`EncoderConfig.quality_for`
+
+**Was:** one `crf` key fed both codecs, with `writer.py` swapping the flag name
+to `-global_quality` for QSV. But those are different scales — the same number
+means different quality on each — so the recorded quality silently depended on
+which encoder `resolve_encoder()` happened to pick on that machine. Files from
+a QSV machine and an x264 machine were not comparable, which matters when the
+footage is pooled into one DLC training set.
+
+**Chosen:** separate `crf` and `qsv_global_quality` keys, plus per-codec
+`preset`, selected by `EncoderConfig.quality_for()` / `preset_for()`.
+`qsv_global_quality` falls back to `crf` when absent so an older config still
+loads. A test asserts each codec gets its own flag and value.
+
+**Rework if wrong:** low, and the values themselves are meant to be replaced by
+measurement (`tools/measure_encoder.py`) rather than argued about.
+
+---
+
 ## A9.5 · pixel-format-mono8-vs-colour
 
 **File:** `acquisition/config.toml` `capture.pixel_format`
