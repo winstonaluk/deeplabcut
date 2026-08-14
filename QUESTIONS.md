@@ -57,6 +57,116 @@ change (the `auto_flags` field is an open string set already).
 
 ---
 
+## A9.5 · a9-userset-verification — RESOLVED
+
+**File:** `acquisition/config.toml` `[camera_verify]`,
+`acquisition/acquisition/camera_backend.py` `verify_settings`
+
+**Was:** `SPINNAKER_PLAN.md` left the UserSet verification strategy open —
+"that expected set of values is lab/rig-specific and unknown to this
+scaffold" — with a `# TODO(QUESTIONS.md): a9-userset-verification`.
+
+**Resolved by measurement.** Probing the camera (2026-08-14) showed it boots
+into factory `Default` with `ExposureAuto` and `GainAuto` on `Continuous`,
+`GammaEnable` True at 0.80, and `AcquisitionFrameRateEnable` False. Those are
+exactly the settings whose drift corrupts DLC training data, so they are the
+verification list. It lives in `config.toml` as a `[camera_verify]` table of
+node → expected value (invariant 9, config over literals) rather than as
+constants in code, so a second rig with different optics can differ without a
+source change.
+
+**Rework if wrong:** low. Adding or removing a row is a config edit.
+
+---
+
+## A9.5 · chunk-data-enablement-vs-invariant-7
+
+**File:** `acquisition/CLAUDE.md` invariant 7,
+`acquisition/acquisition/SPINNAKER_PLAN.md` `open()`
+
+**Decision faced:** The camera ships with `ChunkModeActive` False and both the
+`FrameID` and `Timestamp` chunks disabled, so invariant 6 ("hardware
+timestamps only") cannot be satisfied without writing camera nodes — which
+invariant 7 says the app never does.
+
+**Options considered:**
+1. App enables chunk data itself at `open()`, idempotently, and logs it.
+2. Require chunk data to be saved into `UserSet1` in SpinView, and have
+   preflight hard-fail when it is missing.
+
+**Chosen:** (1), with invariant 7 amended in `CLAUDE.md` to say so explicitly
+rather than leaving the code quietly contradicting the document. The
+distinction drawn: invariant 7 governs *image-formation* parameters (exposure,
+gain, ROI, gamma, trigger) that change what the science looks like; chunk data
+is a data-integrity requirement of this app, the same category as the stream
+buffer settings the app already has to own because user sets do not cover the
+transport-layer nodemap at all.
+
+Option 2 is the stricter reading and was tempting, but it fails closed on a
+setting nobody would think to check, and its failure mode — a session blocked
+at the rig with an animal in hand — is worse than the app turning on a
+metadata channel it needs.
+
+**Rework if wrong:** low. Deleting the enablement block reverts to option 2's
+behaviour, since preflight verifies the chunks either way.
+
+---
+
+## A9.5 · camera-settings-not-recorded-in-session-metadata
+
+**File:** `shared/schema/session_metadata.py` `CameraInfo`
+
+**Decision faced:** `CameraInfo` records `serial`, `user_set_loaded`, and
+`user_set_verified` — a single bool. Now that `verify_settings` produces a
+per-node result, and resolution / pixel format / achieved frame rate are all
+read off the camera, session metadata *could* record what the camera actually
+was for a given session. That is genuinely useful to the analysis repo's QC
+gate, which currently has no way to know a session ran with auto-exposure on.
+
+**Options considered:**
+1. Extend `CameraInfo` with the measured values now.
+2. Leave `shared/schema/` untouched this pass.
+
+**Chosen:** (2). `shared/schema/` is the cross-repo contract, and
+`acquisition/CLAUDE.md` is explicit that any field change is a `schema_version`
+bump requiring the analysis repo's manifest stage to be updated **in the same
+commit**. This pass is scoped to the acquisition-local camera backend schema;
+dragging a coordinated two-repo version bump into it would widen the blast
+radius well past what was asked.
+
+**Rework if wrong:** low-medium, and additive when it happens — new optional
+fields on `CameraInfo` plus a version bump, not a reshape of anything existing.
+Worth doing deliberately, as its own change, alongside the analysis repo.
+
+---
+
+## A9.5 · pixel-format-mono8-vs-colour
+
+**File:** `acquisition/config.toml` `capture.pixel_format`
+
+**Decision faced:** The camera is a BFS-U3-04S2**C** — a colour sensor
+currently set to `BayerRG8` — while the whole app was built assuming Mono8.
+Someone has to choose what we actually record.
+
+**Options considered:**
+1. Mono8.
+2. BGR8 (debayer, three channels).
+
+**Chosen:** (1) Mono8, and the schema carries both so the choice is one config
+value. DLC gains nothing from colour for this task, Mono8 is a third of the
+bytes on a disk-constrained machine, and debayering costs host CPU on a PC with
+no usable GPU. Recorded honestly in `HARDWARE.md`: because the sensor is
+colour, Mono8 here is luma derived from the Bayer mosaic, so it is slightly
+softer than a true mono sensor at the same pixel count.
+
+**This one is a scientific call, not an engineering one** — flagged for the
+user rather than silently settled. Changing it is `capture.pixel_format` plus
+the matching `[camera_verify]` row; a test asserts those two never drift apart.
+
+**Rework if wrong:** low.
+
+---
+
 ## B1 · stage-2-calibration-has-no-checkpoint
 
 **File:** `analysis/CLAUDE.md` checkpoint table; `analysis/pipeline/contracts.py`

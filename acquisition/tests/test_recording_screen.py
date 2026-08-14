@@ -5,6 +5,8 @@ from __future__ import annotations
 
 import time
 
+import pytest
+
 from PySide6.QtCore import QEvent, Qt
 from PySide6.QtGui import QKeyEvent
 
@@ -59,6 +61,7 @@ def test_preview_tile_created_per_camera_rig(qapp, tmp_path):
             rig.controller.stop()
 
 
+@pytest.mark.requires_ffmpeg
 def test_spacebar_starts_and_stops_a_trial(qapp, tmp_path):
     screen, session, rigs = _make_screen(tmp_path)
     try:
@@ -96,6 +99,7 @@ def test_reason_code_hotkey_toggles_flag_and_chip_style(qapp, tmp_path):
             rig.controller.stop()
 
 
+@pytest.mark.requires_ffmpeg
 def test_ctrl_delete_discards_last_trial(qapp, tmp_path):
     screen, session, rigs = _make_screen(tmp_path)
     try:

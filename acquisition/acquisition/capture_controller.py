@@ -13,7 +13,7 @@ from __future__ import annotations
 import threading
 
 from acquisition.camera_backend import CameraBackend
-from acquisition.frame import Frame
+from acquisition.frame import Frame, PixelFormat
 from acquisition.frame_queue import BoundedFrameQueue
 from acquisition.preroll_buffer import PreRollBuffer
 
@@ -48,6 +48,21 @@ class CaptureController:
     def detach_sink(self) -> None:
         with self._sink_lock:
             self._sink = None
+
+    @property
+    def resolution(self) -> tuple[int, int]:
+        """What the camera is actually delivering -- the writer sizes its
+        FFmpeg pipe from this, not from config (preflight has already
+        confirmed the two agree)."""
+        return self._camera.resolution
+
+    @property
+    def pixel_format(self) -> PixelFormat:
+        return self._camera.pixel_format
+
+    @property
+    def incomplete_frame_count(self) -> int:
+        return self._camera.incomplete_frame_count
 
     @property
     def latest_frame(self) -> Frame | None:

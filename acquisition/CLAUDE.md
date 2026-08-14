@@ -56,13 +56,28 @@ Graphics 630 · 500 GB total · Windows.
 - HD 630 **does** have Quick Sync fixed-function H.264/HEVC encode. Use it.
 - 500 GB is a real constraint. Disk management is a feature, not an afterthought.
 
-**Camera:** one Teledyne FLIR machine vision camera, 720p60, global shutter, via
-Spinnaker/PySpin. Two more views (lateral, top-down) come later.
+**Camera:** one Teledyne FLIR **Blackfly S BFS-U3-04S2C**, serial `22514545`,
+USB3, global shutter, via Spinnaker/PySpin 4.3.0.190. Two more views (lateral,
+top-down) come later.
+
+- Sensor is **720 × 540** (Sony IMX287, 0.4 MP) — *not* 1280 × 720. The old
+  "720p60" note was a misread of "720 × 540"; every figure derived from it was
+  wrong-high.
+- It is a **colour** sensor (`BayerRG8`). We record Mono8, which on this camera
+  is luma derived from the Bayer mosaic rather than a native mono readout.
+- Python is pinned to **3.10** by the `cp310` PySpin wheel; numpy must be **< 2**.
+
+`acquisition/acquisition/HARDWARE.md` records what the camera actually reports,
+measured rather than assumed. **When it and a design note disagree, it wins.**
+Regenerate it with `python tools/probe_camera.py` after any firmware change,
+camera swap, or SpinView reconfiguration.
 
 ## Stack
 
-Python 3.10+ · PySide6 (LGPL — **not PyQt5**) · PySpin · FFmpeg via subprocess
-(`h264_qsv`, fallback `libx264`).
+Python **3.10 exactly** (pinned by the `cp310` PySpin wheel — `tomllib` is 3.11+,
+so config loading falls back to the `tomli` backport) · PySide6 (LGPL — **not
+PyQt5**) · PySpin · numpy **< 2** (PySpin does not support 2.x) · FFmpeg via
+subprocess (`h264_qsv`, fallback `libx264`).
 
 ## Architecture invariants
 
@@ -81,10 +96,23 @@ Do not violate these. If a request seems to require breaking one, stop and ask.
 5. **Preview is throttled** to ~15 fps regardless of 60 fps capture, and reads
    latest-frame rather than consuming the write queue.
 6. **Hardware timestamps only.** Chunk data timestamps + frame IDs to a per-trial
-   CSV sidecar. Never substitute host wall-clock arrival time.
+   CSV sidecar. Never substitute host wall-clock arrival time. Requires the app
+   to enable chunk data — see the carve-out in invariant 7.
 7. **No camera configuration UI.** Exposure/gain/ROI/gamma/trigger are set in
-   SpinView and saved to `UserSet1`. App calls `UserSetLoad` at startup, verifies,
-   and logs the result. Never expose these as editable controls.
+   SpinView and saved to `UserSet1`. App calls `UserSetLoad` at startup, verifies
+   against the `[camera_verify]` table in config, and logs the result. Never
+   expose these as editable controls, and never write a node to make a check
+   pass — the app refuses to record against a wrongly-configured camera, it does
+   not silently fix one.
+
+   **Carve-out:** this invariant governs *image-formation* parameters, the ones
+   that change what the science looks like. It does not cover settings that are
+   data-integrity requirements of this app, which the app sets itself and logs:
+   **chunk data** (`ChunkModeActive`, `ChunkEnable` for FrameID and Timestamp —
+   invariant 6 is unsatisfiable without them, and the camera ships with them
+   off) and **stream buffers** (`StreamBufferHandlingMode`,
+   `StreamBufferCountManual` — these live in the transport-layer nodemap, which
+   user sets do not cover at all).
 8. **Trial stop is a pluggable predicate.** Currently keypress-driven; will become
    pose-driven. Never weld the stop condition into a Qt event handler.
 9. **Config over literals.** Durations, thresholds, keymaps, paths, encoder
@@ -171,7 +199,8 @@ confirmation, decrementing the counter. Every hotkey also has a large on-screen 
 
 Rolling in-RAM buffer of the most recent **2 s** (config) per camera, running
 whenever streaming — not just during trials. Prepended on trial start so descent
-onset is never clipped by reaction time. ~55 MB per camera per 2 s at 720p Mono8/30fps.
+onset is never clipped by reaction time. **~23 MB** per camera per 2 s at
+720 × 540 Mono8 / 30 fps.
 
 ## Files and naming
 
@@ -208,10 +237,13 @@ onset is never clipped by reaction time. ~55 MB per camera per 2 s at 720p Mono8
 
 ## Storage
 
-Acquisition runs at **30 fps** (camera capable of 60; fps is a config value).
-~37 MB/min at 720p30 H.264. A 3-min trial ≈ 110 MB; a 10-trial session ≈ 1.1 GB
-on one camera, ~3.3 GB at three. Against ~350 GB usable, transfer workflow is
-essential, not a convenience.
+Acquisition runs at **30 fps** (fps is a config value; the sensor can go far
+faster, but exposure time is the binding constraint). Raw rate is **11.7 MB/s**
+at 720 × 540 Mono8; encoded H.264 is a fraction of that. The old ~37 MB/min
+figure was computed for 1280 × 720 and is an over-estimate — re-measure against
+real encoded output once FFmpeg is installed, rather than substituting another
+guess. Against ~350 GB usable, transfer workflow is still essential, not a
+convenience.
 
 - Live free-space indicator **and estimated remaining-recording-time** from
   measured bitrate. GB free is not actionable mid-session; "47 min remaining" is.
@@ -224,17 +256,31 @@ essential, not a convenience.
 
 ## Preflight checks
 
-Camera detected · `UserSet1` loaded and verified · FFmpeg available · free disk
-above threshold. Block recording and show a clear message on any failure.
+Camera detected · `UserSet1` loaded · every `[camera_verify]` node matching ·
+reported resolution matching config · reported frame rate matching config
+within `capture.fps_tolerance` · FFmpeg available · free disk above threshold.
+Block recording and show a clear message on any failure.
+
+**Config is not ground truth about the hardware** — it is what we intend the
+hardware to be doing. The backend reports what it is *actually* doing
+(`resolution`, `pixel_format`, `frame_rate`, `verify_settings`) and preflight
+compares the two. Never assume they agree: a 1280 × 720 config value meeting a
+720 × 540 sensor produced no error at all, just silently sheared video.
+
+Preflight does not short-circuit on the first failure. An experimenter with an
+animal in hand should see everything that needs fixing in one pass.
 
 ## Project structure
 
 ```
 gui/           PySide6 screens and widgets
 acquisition/   CameraBackend, capture threads, ring buffer, writer
+               HARDWARE.md      what the camera measurably is
+               SPINNAKER_PLAN.md  A10 implementation plan
 paradigms/     Paradigm ABC + PDCTParadigm
 storage/       Naming, metadata, sidecars, disk mgmt, staging
 pose/          PoseProvider protocol, NullPoseProvider, TriggerService stub
+tools/         Hardware probes. Need PySpin; outside the package and the suite.
 tests/
 config.toml
 ```
@@ -250,7 +296,15 @@ python -m app
 
 # tests (must pass with no hardware attached)
 pytest
+
+# read the camera and refresh HARDWARE.md (acquisition PC only; needs PySpin)
+python tools/probe_camera.py
 ```
+
+Tests that spawn FFmpeg are marked `requires_ffmpeg` and skip automatically when
+it isn't on PATH, so a missing external binary reports as one named skip rather
+than eleven identical tracebacks. **FFmpeg is not currently installed on the
+acquisition PC.**
 
 ## Conventions
 
@@ -293,4 +347,6 @@ When running headless (`claude -p`) I cannot answer questions. Therefore:
 | A6 | Recording screen | Preview tiles, large-font readouts, spacebar control, reason-code hotkeys from the config keymap, flag targeting (current-if-recording else most-recent), visual flag feedback. |
 | A7 | Review screen | Trial table, flag editing, note entry, `other_invalid` reason assignment. Skippable. |
 | A8 | Storage + staging | Free-space indicator, remaining-time estimate, hard block below threshold, staging with checksum verification, confirm-gated purge. |
-| A9 | `SpinnakerCamera` | **Not buildable unattended — requires hardware.** Scaffold the class against `CameraBackend` with `NotImplementedError` bodies and a written plan referencing the PySpin examples. |
+| A9 | `SpinnakerCamera` scaffold | **Done.** Class scaffolded against `CameraBackend`, plan written. Superseded by the A9.5 schema pass below, which rewrote the plan against real hardware. |
+| A9.5 | Camera backend schema | **Done.** Backend reports `resolution`, `pixel_format`, `frame_rate`, `verify_settings`, `incomplete_frame_count`; preflight asserts config against all of them; writer derives geometry and pixel format from the backend; `[camera_verify]` table in config; `HARDWARE.md` records the measured camera. |
+| A10 | `SpinnakerCamera` implementation | **Requires hardware.** Fill in the five lifecycle bodies per `SPINNAKER_PLAN.md`. Done when a 60 s recording plays back at the configured rate with a monotonic timestamp sidecar, no frame-ID gaps, and zero incomplete frames. **Blocked** on `UserSetLoad` being non-executable — see `HARDWARE.md`. |

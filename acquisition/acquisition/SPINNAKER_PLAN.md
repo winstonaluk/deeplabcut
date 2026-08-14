@@ -1,117 +1,214 @@
 # SpinnakerCamera implementation plan
 
-**Not buildable unattended (checkpoint A9).** Requires the Spinnaker SDK, a
-matching PySpin wheel, and a physically connected FLIR camera -- none of
-which exist in this environment. `spinnaker_camera.py` scaffolds the class
-against `CameraBackend` with `NotImplementedError` bodies; this document is
-the plan for filling them in once hardware is available.
+**Checkpoint A10.** The `CameraBackend` schema is settled and `spinnaker_camera.py`
+satisfies it; what remains is filling in five method bodies against real
+hardware. This document is that plan.
 
-References below are to the standard example scripts shipped in the
-Spinnaker SDK's `src/` (C++) / `Python3/examples/` directory --
-`Acquisition.py`, `ImageEvents.py` (sometimes named `Callback.py` depending
-on SDK version), `UserSets.py`, `ChunkData.py`, `NodeMapInfo.py`. Verify
-exact filenames against whatever SDK version ships with the lab's camera,
-since Teledyne renames/reorganizes these occasionally between releases.
+Rewritten 2026-08-14 against the rig's actual camera rather than against
+generic SDK examples — every node name here was confirmed present on the
+device. Read `HARDWARE.md` in this directory first: it records what the camera
+actually reports, including the parts that contradicted the original design
+notes.
 
 ## Prerequisites
 
-1. Install the Spinnaker SDK (vendor installer, not pip).
-2. Install the matching PySpin wheel from the SDK's `python/` subdirectory
-   for the exact Python version and OS in use -- PySpin wheels are built
-   per-Python-version and are not forward/backward compatible.
-3. Camera physically connected (GigE or USB3 depending on model). For GigE,
-   confirm jumbo frames / firewall exceptions per Teledyne's network
-   configuration guide -- dropped frames on a GigE camera are very often a
-   network MTU/driver issue, not an application bug.
+1. Spinnaker SDK installed (vendor installer, not pip). **Already done** on the
+   acquisition PC: 4.3.0.190.
+2. The matching PySpin wheel. **Already installed** in the `acquire` conda env:
+   `spinnaker_python-4.3.0.190-cp310`. Note PySpin wheels are built per Python
+   version and are not forward/backward compatible — this one pins the app to
+   Python 3.10, which is why `app/config.py` falls back to the `tomli` backport
+   instead of stdlib `tomllib`.
+3. numpy **< 2**. PySpin does not support numpy 2.x; `requirements.txt` carries
+   the upper bound.
+4. Camera connected. It is USB3, not GigE — none of the GigE MTU/jumbo-frame/
+   packet-size tuning advice applies, and there is ample link headroom
+   (380 MB/s limit against the ~11.7 MB/s we need).
 
-## System / CameraList lifetime (cross-cutting -- affects all methods)
+**Blocked before this can be verified end to end:** `UserSetLoad` currently
+reports access mode RO and raises `AccessException` on `Execute()`. See
+HARDWARE.md, "Open hardware blocker". Steps 2 and 3 below cannot be tested
+until someone at the rig clears that.
 
-`PySpin.System.GetInstance()` is process-wide, not per-camera. Because this
-app is N-camera by construction (invariant 1), `SpinnakerCamera` instances
-must **share one `System` instance** rather than each calling
-`GetInstance()` independently -- pattern this as a module-level lazily
-created singleton with reference counting, released via
-`system.ReleaseInstance()` only when the last camera closes. Getting this
-wrong (releasing while another camera is still open) is a classic PySpin
-crash source.
+## Reference examples
+
+From the SDK's Python examples, vendored at `docs/PySpinExamples/`:
+
+| Example | Use it for |
+|---|---|
+| `Acquisition.py` | device enumeration, `AcquisitionMode`, begin/end acquisition |
+| `ImageEvents.py` | the `ImageEventHandler` subclass pattern (invariant 3) |
+| `ChunkData.py` | `ChunkSelector`/`ChunkEnable` loop, reading chunk data off an image |
+| `BufferHandling.py` | `StreamBufferHandlingMode`, `StreamBufferCountManual` |
+| `ImageFormatControl.py` | the general enumeration-node get/set pattern |
+| `NodeMapInfo.py` | node access-mode inspection when something is unreadable |
+
+**There is no `UserSets.py`** in this SDK's Python examples — the original plan
+cited one, but it is a C++-only example. Use the enumeration + command node
+pattern from `ImageFormatControl.py` instead.
+
+## System / CameraList lifetime (cross-cutting)
+
+`PySpin.System.GetInstance()` is process-wide, not per-camera. Because the app
+is N-camera by construction (invariant 1), `SpinnakerCamera` instances must
+**share one `System`** rather than each calling `GetInstance()` — a module-level
+lazily created singleton with reference counting, released via
+`system.ReleaseInstance()` only when the last camera closes. Releasing while
+another camera is still open is a classic PySpin crash.
+
+PySpin also requires `CameraPtr` and `CameraList` to be explicitly `del`'d
+before `ReleaseInstance()`; they are not cleaned up by scope exit the way the
+C++ objects are.
 
 ```python
-# sketch, not final:
-_system: PySpin.System | None = None
+_system = None
 _open_camera_count = 0
+_system_lock = threading.Lock()
 ```
 
 ## `open()`
 
-1. Acquire the shared `System` (see above); `system.GetCameras()` ->
-   `PySpin.CameraList`.
-2. Find the target camera by serial: iterate the list, read
-   `cam.TLDevice.DeviceSerialNumber.GetValue()` per `Acquisition.py`'s
-   device enumeration pattern, match against `self._serial`.
-3. If not found: raise `CameraError` (do not raise `PySpin.SpinnakerException`
-   directly -- keep PySpin as an implementation detail behind the
-   `CameraBackend` interface, same as `CameraError` already does for the
-   mock path's error surface).
-4. `cam.Init()`. Wrap in `try/except PySpin.SpinnakerException as exc: raise
-   CameraError(str(exc)) from exc` -- every PySpin call below should follow
-   this same wrapping convention.
+Idempotent — preflight opens the camera and leaves it open on success, and
+`CaptureController.start()` then opens it again. A second call must be a no-op.
+
+1. Acquire the shared `System`; `system.GetCameras()` → `PySpin.CameraList`.
+2. Find the camera by serial: iterate, read
+   `PySpin.CStringPtr(cam.GetTLDeviceNodeMap().GetNode("DeviceSerialNumber")).GetValue()`,
+   match against `self._serial`. Not found → `CameraError`, never a raw
+   `PySpin.SpinnakerException` (keep PySpin behind the interface).
+3. `cam.Init()`.
+4. Read and cache what the backend must report about itself:
+   - `self._resolution` from the `Width`/`Height` nodes.
+   - `self._frame_rate` from `AcquisitionResultingFrameRate` — **not**
+     `AcquisitionFrameRate`, which is a ceiling. On the rig camera these read
+     66.12 and 199.93 respectively; the first is the truth.
+5. Configure chunk data (below).
+6. Configure stream buffers (below).
+7. Set `AcquisitionMode` to `Continuous`.
+
+### Chunk data
+
+The camera ships with `ChunkModeActive` False and both required chunks
+disabled, so **invariant 6 is unsatisfiable unless the app enables them**:
+
+```python
+for chunk_name in REQUIRED_CHUNKS:          # ("FrameID", "Timestamp")
+    selector.SetIntValue(selector.GetEntryByName(chunk_name).GetValue())
+    PySpin.CBooleanPtr(nodemap.GetNode("ChunkEnable")).SetValue(True)
+PySpin.CBooleanPtr(nodemap.GetNode("ChunkModeActive")).SetValue(True)
+```
+
+Then verify by reading back, and log that the app did it. This is a deliberate,
+documented carve-out from invariant 7 — see the invariant 7 note in
+`acquisition/CLAUDE.md`. Also read `TimestampIncrement` here and log it: it is
+1000 on this camera, meaning the chunk timestamp is already in nanoseconds and
+needs no scaling, but that is a per-model property and should not be assumed.
+
+### Stream buffers
+
+From `cam.GetTLStreamNodeMap()` — **not** covered by user sets, so the app owns
+these outright:
+
+- `StreamBufferHandlingMode` → `OldestFirst`. Never `NewestOnly`: it drops
+  frames silently, which is right for a viewer and wrong for a recorder.
+- `StreamBufferCountMode` → `Manual`, then `StreamBufferCountManual` →
+  `capture.stream_buffer_count` (64 ≈ 2 s of slack at 30 fps; the camera ships
+  with 10 ≈ 0.33 s).
+
+Log the achieved count — the node clamps to its own max.
 
 ## `load_user_set(user_set_name)`
 
-Per `UserSets.py`:
-
 1. `nodemap = cam.GetNodeMap()`.
-2. Get the `UserSetSelector` enumeration node, set it to `user_set_name`
-   (e.g. `"UserSet1"`).
+2. Set `UserSetSelector` to `user_set_name` (e.g. `"UserSet1"`).
 3. Execute the `UserSetLoad` command node.
-4. **Verification is the open question here.** PySpin has no single
-   "did it load correctly" call -- verification means re-reading specific
-   node values after load and comparing against what `UserSet1` is expected
-   to contain (exposure mode, gain, ROI, etc., per SpinView). That expected
-   set of values is lab/rig-specific and unknown to this scaffold.
-   `# TODO(QUESTIONS.md): a9-userset-verification` -- when hardware is
-   available, log the chosen verification strategy (e.g. "check
-   `ExposureAuto` reads `Off`" or similar) to `QUESTIONS.md` rather than
-   guessing here.
+4. Return True on success, False on failure. Never raise for a load failure —
+   preflight decides whether it blocks.
+
+Check `PySpin.IsWritable()` on the command node before executing and return
+False with a clear log line if it is not, rather than letting the
+`AccessException` escape as a crash. That is the live failure mode on this
+camera today.
+
+## `verify_settings(expected)`
+
+Read-only. For each `node_name, expected_value` in `expected` (which comes from
+`config.toml`'s `[camera_verify]`):
+
+1. `node = nodemap.GetNode(node_name)`; if absent or unreadable, that is a
+   **failed** `NodeCheck` with actual `"<unreadable>"`, not an exception.
+2. Read it as a string: enumerations via
+   `CEnumerationPtr(node).GetCurrentEntry().GetSymbolic()`, booleans/integers/
+   floats via `str(ptr(node).GetValue())`. The probe script's `read()` helper
+   in `tools/probe_camera.py` is the working version of this — reuse its
+   pointer-cast cascade.
+3. Compare as strings, build the `NodeCheck`.
+
+**Never write a node to make a check pass.** That is what keeps invariant 7
+intact: the app refuses to record against a wrongly-configured camera, it does
+not silently fix it.
+
+Float-valued nodes compared as strings will be brittle if any are ever added to
+`[camera_verify]`. Today the table holds only enumerations and booleans; the
+numeric frame-rate check is done separately and numerically by preflight,
+against `capture.fps_tolerance`.
 
 ## `start_streaming(on_frame)`
 
-This is where invariant 3 ("not polling") is actually earned:
+Where invariant 3 ("not polling") is earned. Subclass
+`PySpin.ImageEventHandler` and override `OnImageEvent(self, image)`:
 
-1. Subclass `PySpin.ImageEventHandler`, override `OnImageEvent(self, image)`.
-   Inside the handler:
-   - Pull chunk data: `chunk_data = image.GetChunkData()`;
-     `chunk_data.GetTimestamp()` for the hardware timestamp,
-     `chunk_data.GetFrameID()` for the frame ID -- this is what invariant 6
-     ("hardware timestamps only") requires; never substitute
-     `time.time()`/`datetime.now()` here.
-   - Convert pixel format if needed via `PySpin.ImageProcessor().Convert(image,
-     PySpin.PixelFormat_Mono8)` (matches `MockCamera`'s Mono8 frames).
-   - `image.GetNDArray()` for the numpy array.
-   - Build our `Frame(image=..., hardware_timestamp_ns=..., frame_id=...)`
-     and call the injected `on_frame` callback -- same contract
-     `MockCamera` already provides, so `CaptureController` needs no changes.
-   - **Must call `image.Release()`** before returning, every time, even on
-     an error path -- omitting this exhausts the camera's buffer pool and
-     is the single most common PySpin bug per `ImageEvents.py`'s comments.
-2. `cam.RegisterEventHandler(handler)`, then `cam.BeginAcquisition()`.
-3. Keep a reference to the handler instance on `self` -- PySpin does not
-   keep the Python object alive on its own, and a garbage-collected handler
-   silently stops firing.
+```python
+def OnImageEvent(self, image):
+    try:
+        if image.IsIncomplete():
+            self._incomplete += 1        # own counter; see below
+            return
+        chunk = image.GetChunkData()
+        converted = self._processor.Convert(image, PySpin.PixelFormat_Mono8)
+        arr = np.array(converted.GetNDArray(), copy=True)   # see below
+        self._on_frame(Frame(
+            image=arr,
+            hardware_timestamp_ns=int(chunk.GetTimestamp()),
+            frame_id=int(chunk.GetFrameID()),
+            pixel_format=self._pixel_format,
+        ))
+    finally:
+        image.Release()                  # every path, always
+```
+
+Three details, each of which fails quietly if missed:
+
+- **Copy the array.** `GetNDArray()` returns a view onto a buffer the SDK
+  recycles at `Release()`. Frames outlive this callback — the pre-roll deque
+  holds ~60 and the writer queue up to 120 — so a view would alias data the
+  camera has already overwritten. The corruption scales with queue depth and
+  looks like a compression artifact. This is the highest-risk line in the file.
+- **Release on every path**, including exceptions, or the camera's buffer pool
+  is exhausted and acquisition stalls.
+- **Count incomplete frames separately** from the writer queue's dropped
+  frames. A full queue means the encoder can't keep up; an incomplete image
+  means the camera-to-host link dropped data. Different causes, different
+  fixes, so they never share a counter — hence
+  `CameraBackend.incomplete_frame_count`.
+
+Then `cam.RegisterEventHandler(handler)` and `cam.BeginAcquisition()`. **Keep a
+reference to the handler on `self`** — PySpin does not keep the Python object
+alive, and a garbage-collected handler silently stops firing.
+
+`ImageProcessor` should be constructed once and held, not per frame.
 
 ## `stop_streaming()`
 
 `cam.EndAcquisition()`, then `cam.UnregisterEventHandler(handler)`. Order
-matters: unregistering before ending acquisition has caused crashes in past
-Spinnaker versions per community reports -- confirm against the SDK version
-actually in use.
+matters — unregistering before ending acquisition has caused crashes in past
+Spinnaker versions. Idempotent when not streaming.
 
 ## `close()`
 
-`cam.DeInit()`, drop the Python reference to `cam` (`del self._cam`) before
-`cam_list.Clear()`, then decrement the shared open-camera count and call
-`system.ReleaseInstance()` only when it reaches zero (see System lifetime
-note above).
+`cam.DeInit()`, `del self._camera`, then `cam_list.Clear()`, then decrement the
+shared open-camera count and call `system.ReleaseInstance()` only at zero.
+Idempotent.
 
 ## Error handling convention
 
@@ -124,25 +221,32 @@ except PySpin.SpinnakerException as exc:
     raise CameraError(str(exc)) from exc
 ```
 
-so `CameraBackend` callers (preflight, CaptureController) never need to
-import or catch PySpin-specific exceptions.
+so callers (preflight, `CaptureController`) never import or catch
+PySpin-specific exceptions.
 
-## Threading contract (unchanged from MockCamera)
+`import PySpin` stays **inside** methods, never at module scope, so this module
+remains importable — and `python -m app --mock` remains runnable — on a machine
+with no SDK (invariant 2).
 
-`OnImageEvent` runs on a Spinnaker-internal thread already -- this *is* the
-"not polling" requirement from invariant 3. `on_frame` executes on that
-thread, exactly like `MockCamera`'s background thread today.
-`CaptureController.attach_sink()` / the bounded queue handle the handoff to
-the writer thread identically regardless of which `CameraBackend`
-implementation is feeding them; no changes needed there when this scaffold
-is filled in.
+## Threading contract (unchanged)
 
-## Known open questions to log when hardware work resumes
+`OnImageEvent` runs on a Spinnaker-internal thread, which *is* the "not
+polling" requirement. `on_frame` executes on that thread, exactly as
+`MockCamera`'s background thread does today, so `CaptureController` and the
+bounded queue need no changes for either backend.
 
-- `UserSet1` verification strategy (see above).
-- Confirm the camera's native pixel format is actually Mono8 (assumed
-  throughout this app per acquisition/CLAUDE.md's "720p60, global shutter"
-  hardware note, but not yet confirmed against the specific sensor).
-- GigE vs USB3 interface-specific buffer/packet-size tuning if dropped
-  frames appear at 30fps 720p that MockCamera's software-only path can't
-  reproduce.
+## Testing
+
+The suite must still pass with the camera unplugged (invariant 2). So:
+
+- Everything provable without hardware is already tested against `MockCamera`
+  in `tests/test_camera_schema.py` — the schema, the preflight comparisons, the
+  writer's geometry guard.
+- Hardware tests go behind a `@pytest.mark.hardware` marker, deselected by
+  default, in the same shape as the existing `requires_ffmpeg` marker in
+  `tests/conftest.py`.
+
+**A10 is done when** a 60-second recording against the real camera produces a
+playable file at the configured rate, with a timestamp sidecar whose hardware
+timestamps increase monotonically, whose frame IDs have no gaps, and with zero
+incomplete frames.

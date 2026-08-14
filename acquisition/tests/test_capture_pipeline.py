@@ -6,6 +6,8 @@ from __future__ import annotations
 import json
 import subprocess
 import time
+
+import pytest
 import tracemalloc
 from pathlib import Path
 
@@ -36,6 +38,7 @@ def _ffprobe_frame_count(path: Path) -> int:
     return int(data["streams"][0]["nb_read_frames"])
 
 
+@pytest.mark.requires_ffmpeg
 def test_mock_capture_produces_playable_h264(tmp_path):
     width = height = 32
     fps = 50
@@ -94,6 +97,7 @@ def test_queue_drops_and_counts_under_backpressure():
     assert frame_queue.qsize() <= frame_queue.maxsize
 
 
+@pytest.mark.requires_ffmpeg
 def test_writer_memory_growth_stays_bounded_over_a_long_run(tmp_path):
     width = height = 32
     fps = 30

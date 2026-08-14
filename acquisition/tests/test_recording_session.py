@@ -60,6 +60,7 @@ def _teardown(rigs):
         rig.controller.stop()
 
 
+@pytest.mark.requires_ffmpeg
 def test_full_trial_lifecycle_writes_video_timestamps_and_trials_csv(tmp_path):
     controller, rigs = _make_controller(tmp_path)
     try:
@@ -98,6 +99,7 @@ def test_min_duration_swallow_leaves_trial_recording(tmp_path):
         _teardown(rigs)
 
 
+@pytest.mark.requires_ffmpeg
 def test_multi_camera_writes_one_file_pair_per_camera(tmp_path):
     controller, rigs = _make_controller(tmp_path, n_cameras=2, include_view_token=True)
     try:
@@ -116,6 +118,7 @@ def test_multi_camera_writes_one_file_pair_per_camera(tmp_path):
         _teardown(rigs)
 
 
+@pytest.mark.requires_ffmpeg
 def test_flag_toggle_targets_current_recording_trial(tmp_path):
     controller, rigs = _make_controller(tmp_path)
     try:
@@ -133,6 +136,7 @@ def test_flag_toggle_targets_current_recording_trial(tmp_path):
         _teardown(rigs)
 
 
+@pytest.mark.requires_ffmpeg
 def test_flag_toggle_targets_most_recent_completed_trial_after_stop(tmp_path):
     controller, rigs = _make_controller(tmp_path)
     try:
@@ -164,6 +168,7 @@ def test_flag_toggle_is_a_toggle_not_a_set(tmp_path):
         _teardown(rigs)
 
 
+@pytest.mark.requires_ffmpeg
 def test_discard_last_removes_files_and_record(tmp_path):
     controller, rigs = _make_controller(tmp_path)
     try:
@@ -186,6 +191,7 @@ def test_discard_last_removes_files_and_record(tmp_path):
         _teardown(rigs)
 
 
+@pytest.mark.requires_ffmpeg
 def test_max_duration_auto_stop_via_tick_finalizes_the_trial(tmp_path):
     timing = TrialTimingConfig(min_trial_duration_s=0.05, suspicious_duration_s=0.1, max_trial_duration_s=0.2)
     controller, rigs = _make_controller(tmp_path, timing=timing)
@@ -204,6 +210,7 @@ def test_max_duration_auto_stop_via_tick_finalizes_the_trial(tmp_path):
         _teardown(rigs)
 
 
+@pytest.mark.requires_ffmpeg
 def test_dropped_frame_count_aggregates_across_cameras(tmp_path):
     controller, rigs = _make_controller(tmp_path, n_cameras=2)
     try:

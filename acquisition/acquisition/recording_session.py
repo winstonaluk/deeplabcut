@@ -194,15 +194,20 @@ class RecordingSessionController:
         for rig in self._rigs:
             preroll_frames = rig.controller.preroll.snapshot()
             queue = BoundedFrameQueue(maxsize=self._config.capture.queue_maxsize)
+            # Geometry and source format come from the camera, not config:
+            # preflight has already blocked the session if they disagree, so
+            # this is the same value with the hardware as its authority.
+            width, height = rig.controller.resolution
             writer = WriterThread(
                 frame_queue=queue,
                 output_path=self._session_dir / self._video_filename(rig, wall_start, trial_number),
-                width=self._config.capture.width,
-                height=self._config.capture.height,
+                width=width,
+                height=height,
                 fps=self._config.capture.fps,
                 codec=self._config.encoder.codec,
                 crf=self._config.encoder.crf,
                 pixel_format=self._config.encoder.pixel_format,
+                source_pixel_format=rig.controller.pixel_format,
                 preroll_frames=preroll_frames,
             )
             writer.start()

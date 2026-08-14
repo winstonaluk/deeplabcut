@@ -1,6 +1,12 @@
 PySide6>=6.5
-numpy>=1.24
+# PySpin does not support numpy 2.x (see the SDK's PySpin README, "Numpy 2.x:
+# Module Compatibility Notice"). Unbounded, a fresh install pulls 2.x and
+# `import PySpin` stops working, so the upper bound is load-bearing.
+numpy>=1.24,<2
 pytest>=7.4
+# tomllib is stdlib from 3.11; the acquisition PC runs 3.10 because its PySpin
+# wheel is cp310-only.
+tomli>=2.0; python_version < "3.11"
 
 # PySpin (Teledyne FLIR Spinnaker Python bindings) is distributed by the
 # vendor, not on PyPI. Install the wheel matching your Python/OS from the

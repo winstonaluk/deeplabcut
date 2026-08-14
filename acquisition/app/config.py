@@ -7,9 +7,20 @@ directly -- see acquisition/CLAUDE.md invariant 9 ("Config over literals").
 
 from __future__ import annotations
 
-import tomllib
+import sys
 from dataclasses import dataclass
 from pathlib import Path
+
+# tomllib is stdlib only from Python 3.11. The acquisition PC is pinned to
+# Python 3.10 by its PySpin wheel (spinnaker_python-4.3.0.190-cp310), which is
+# built per-Python-version and has no 3.11 build in the SDK we have -- so the
+# app must keep running on 3.10, and falls back to the `tomli` backport there.
+if sys.version_info >= (3, 11):
+    import tomllib
+else:  # pragma: no cover - exercised on the acquisition PC, not in CI
+    import tomli as tomllib
+
+from acquisition.frame import PixelFormat
 
 
 class ConfigError(ValueError):
@@ -31,6 +42,23 @@ class CaptureConfig:
     queue_maxsize: int
     preview_fps: int
     preroll_buffer_s: float
+    fps_tolerance: float = 0.5
+    stream_buffer_count: int = 64
+    pixel_format: str = "mono8"
+
+    @property
+    def resolution(self) -> tuple[int, int]:
+        return (self.width, self.height)
+
+    @property
+    def source_pixel_format(self) -> PixelFormat:
+        try:
+            return PixelFormat(self.pixel_format)
+        except ValueError as exc:
+            raise ConfigError(
+                f"capture.pixel_format must be one of "
+                f"{[f.value for f in PixelFormat]}, got {self.pixel_format!r}"
+            ) from exc
 
 
 @dataclass(frozen=True)
@@ -79,6 +107,7 @@ class AppConfig:
     trial_timing: TrialTimingConfig
     keymap: dict[str, str]  # key -> reason_code
     reason_code_labels: dict[str, str]  # reason_code -> human label
+    camera_verify: dict[str, str]  # camera node -> expected value, checked at preflight
     metadata: MetadataConfig
     storage: StorageConfig
     staging: StagingConfig
@@ -94,11 +123,21 @@ _REQUIRED_TOP_LEVEL = (
     "trial_timing",
     "keymap",
     "reason_code_labels",
+    "camera_verify",
     "metadata",
     "storage",
     "staging",
     "logging",
 )
+
+
+def _node_value_str(value: object) -> str:
+    """Renders a TOML scalar the way a GenICam node reports it.
+
+    Booleans are the only real trap: TOML `false` and PySpin's `"False"` must
+    compare equal, and Python's str(False) already gives "False".
+    """
+    return str(value)
 
 
 def load_config(path: str | Path) -> AppConfig:
@@ -133,6 +172,10 @@ def load_config(path: str | Path) -> AppConfig:
         trial_timing=TrialTimingConfig(**raw["trial_timing"]),
         keymap=dict(raw["keymap"]),
         reason_code_labels=dict(raw["reason_code_labels"]),
+        # Values are stringified on the way in so the [camera_verify] table can
+        # be written naturally in TOML (`GammaEnable = false`) while comparison
+        # against camera nodes stays uniformly string-based.
+        camera_verify={k: _node_value_str(v) for k, v in raw["camera_verify"].items()},
         metadata=MetadataConfig(
             projects=tuple(raw["metadata"]["projects"]),
             experimenter_initials=tuple(raw["metadata"]["experimenter_initials"]),

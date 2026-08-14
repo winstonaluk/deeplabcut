@@ -15,7 +15,7 @@ import subprocess
 import threading
 from pathlib import Path
 
-from acquisition.frame import Frame
+from acquisition.frame import Frame, PixelFormat
 from acquisition.frame_queue import BoundedFrameQueue
 from schema.timestamps import TimestampRow
 
@@ -37,6 +37,7 @@ class WriterThread(threading.Thread):
         codec: str,
         crf: int,
         pixel_format: str,
+        source_pixel_format: PixelFormat = PixelFormat.MONO8,
         preroll_frames: list[Frame] | None = None,
         poll_timeout_s: float = 0.5,
     ) -> None:
@@ -49,6 +50,7 @@ class WriterThread(threading.Thread):
         self._codec = codec
         self._crf = crf
         self._pixel_format = pixel_format
+        self._source_pixel_format = source_pixel_format
         self._preroll_frames = list(preroll_frames or [])
         self._poll_timeout_s = poll_timeout_s
 
@@ -97,7 +99,10 @@ class WriterThread(threading.Thread):
         cmd = [
             "ffmpeg", "-hide_banner", "-loglevel", "error", "-y",
             "-f", "rawvideo",
-            "-pixel_format", "gray8",
+            # Derived from what the backend actually delivers, never assumed:
+            # the rig's camera is a colour sensor, and a hardcoded gray8 here
+            # would misread every byte it produced.
+            "-pixel_format", self._source_pixel_format.ffmpeg_pixel_format,
             "-video_size", f"{self._width}x{self._height}",
             "-framerate", str(self._fps),
             "-i", "-",
@@ -127,6 +132,8 @@ class WriterThread(threading.Thread):
 
     def _write_frame(self, frame: Frame) -> None:
         index = len(self._timestamp_rows)
+        if index == 0:
+            self._assert_frame_matches_pipe(frame)
         self._process.stdin.write(frame.image.tobytes())  # type: ignore[union-attr]
         self._timestamp_rows.append(
             TimestampRow(
@@ -135,6 +142,30 @@ class WriterThread(threading.Thread):
                 frame_id=frame.frame_id,
             )
         )
+
+    def _assert_frame_matches_pipe(self, frame: Frame) -> None:
+        """Fails loudly on the first frame if its geometry doesn't match what
+        FFmpeg was told to expect.
+
+        FFmpeg does not error on a size mismatch -- rawvideo has no framing, so
+        it just re-slices the byte stream and produces sheared video that looks
+        like a codec problem. A 1280x720 config value meeting a 720x540 sensor
+        did exactly that, undetected; this is the guard for it.
+        """
+        expected_shape = self._source_pixel_format.expected_shape(self._width, self._height)
+        if frame.pixel_format is not self._source_pixel_format:
+            raise WriterError(
+                f"{self._output_path}: writer configured for "
+                f"{self._source_pixel_format.value} but frames arrived as "
+                f"{frame.pixel_format.value}"
+            )
+        if frame.image.shape != expected_shape:
+            raise WriterError(
+                f"{self._output_path}: FFmpeg expects {expected_shape} frames "
+                f"({self._width}x{self._height} {self._source_pixel_format.value}) "
+                f"but the camera delivered {frame.image.shape}. Check capture.width "
+                f"and capture.height in config.toml against the camera's actual sensor."
+            )
 
     def _shutdown_process(self) -> None:
         if self._process is None:

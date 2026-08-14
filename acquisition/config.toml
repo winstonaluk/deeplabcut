@@ -16,17 +16,56 @@ user_set = "UserSet1"
 
 [capture]
 fps = 30
-width = 1280
-height = 720
+# 720x540 is the BFS-U3-04S2C's full sensor (Sony IMX287, 0.4 MP) -- NOT
+# 1280x720. The "720p" in the hardware notes was a misread of "720x540".
+# Preflight blocks the session if these disagree with what the camera
+# reports; see acquisition/acquisition/HARDWARE.md.
+width = 720
+height = 540
+# Blocking tolerance, in fps, on the camera's reported rate vs `fps` above.
+fps_tolerance = 0.5
 queue_maxsize = 120
 preview_fps = 15
 preroll_buffer_s = 2.0
+# Transport-layer stream buffers. Not covered by user sets, so the app owns
+# them. 64 buffers is ~2 s of slack at 30 fps against a writer hiccup; the
+# camera ships with 10 (~0.33 s).
+stream_buffer_count = 64
+# mono8 or bgr8. Mono8 is the default: DLC gains nothing from colour here,
+# it is a third of the bytes, and debayering costs host CPU on a machine
+# with no usable GPU. Note the sensor IS colour, so Mono8 is derived luma.
+pixel_format = "mono8"
 
 [encoder]
 codec = "h264_qsv"
 fallback_codec = "libx264"
 crf = 18
 pixel_format = "yuv420p"
+
+[camera_verify]
+# Camera settings read back after UserSetLoad and compared as strings. Any
+# mismatch is its own named preflight failure and blocks the session.
+#
+# This is verification, never configuration (invariant 7): these values are
+# set in SpinView and saved to the user set. The app refuses to record when
+# they are wrong; it does not fix them.
+#
+# Why each one matters:
+#   ExposureAuto/GainAuto  auto-tuning tracks the animal's position down the
+#                          pole, so appearance covaries with the very thing
+#                          DLC is being trained to locate.
+#   GammaEnable            a nonlinearity between sensor and training data.
+#   AcquisitionFrameRate*  unlatched rate means video duration is wrong, and
+#                          duration is the primary dependent variable.
+#   SensorShutterMode      rolling shutter skews a descending animal.
+#   PixelFormat            must agree with capture.pixel_format above.
+ExposureAuto = "Off"
+GainAuto = "Off"
+GammaEnable = "False"
+AcquisitionFrameRateEnable = "True"
+SensorShutterMode = "Global"
+TriggerMode = "Off"
+PixelFormat = "Mono8"
 
 [paradigm]
 active = "pdct"
