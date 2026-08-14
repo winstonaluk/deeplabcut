@@ -18,14 +18,6 @@ def qapp():
     yield app
 
 
-def pytest_configure(config):
-    config.addinivalue_line(
-        "markers",
-        "requires_ffmpeg: test spawns a real FFmpeg process; skipped when "
-        "ffmpeg is not on PATH.",
-    )
-
-
 def pytest_collection_modifyitems(config, items):
     """Skips FFmpeg-dependent tests when FFmpeg isn't installed.
 

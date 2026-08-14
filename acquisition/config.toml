@@ -10,7 +10,7 @@ rig_id = "rig-1"
 # N-camera by construction (invariant 1). One entry today; add more [[cameras]]
 # tables to add views. `name` is a human label (e.g. "lateral"), not the
 # Spinnaker serial.
-serial = "REPLACE_WITH_CAMERA_SERIAL"
+serial = "22514545"  # Blackfly S BFS-U3-04S2C; see acquisition/HARDWARE.md
 name = "lateral"
 user_set = "UserSet1"
 

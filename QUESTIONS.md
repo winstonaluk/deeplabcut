@@ -57,6 +57,42 @@ change (the `auto_flags` field is an open string set already).
 
 ---
 
+## A10 · read-only-nodes-misdiagnosed-as-camera-fault — CORRECTED
+
+**File:** `acquisition/acquisition/HARDWARE.md`, "Resolved: the read-only nodes
+symptom is a parameter lock"
+
+**What I got wrong.** A9.5 recorded `UserSetLoad` and `UserSetSave` reporting
+GenICam access mode RO as an open hardware blocker, possibly a firmware fault or
+an unwritten user set, and listed power-cycling and firmware updates as the way
+out. The reasoning leaned on `DeviceAccessStatus == OpenReadWrite`,
+`StreamIsGrabbing == False` and `TLParamsLocked == 0` to rule out a concurrent
+session.
+
+**Why that was wrong.** All three of those report **host-side state for the
+process doing the probing**. None of them can observe a *different* process
+holding the camera's parameters latched, so they cannot rule out what they were
+used to rule out. The actual cause was a live Spinnaker session: while
+acquisition is armed, FLIR locks the image-format nodes and the user-set
+commands as a group. The user identified this; re-probing after the stream ended
+showed every node back at RW with nothing else changed.
+
+**Consequences for the design:** the app now checks `IsWritable` before
+executing `UserSetLoad` and surfaces an actionable message through preflight
+rather than an `AccessException`, and `close()` always tears the camera down so
+this app does not leave the lock set for the next run. The reliable diagnostic
+is whether the whole cluster of nodes is RO at once, which
+`tools/probe_camera.py` now prints.
+
+**Separately confirmed:** `UserSet1` loads fine — it simply contains factory
+defaults, identical to `UserSet0` and `Default`. The "possibly an empty slot"
+hypothesis was wrong in mechanism but right that the set is unconfigured.
+
+**Rework cost of the error:** none in code; it cost one round of misdirected
+hardware troubleshooting.
+
+---
+
 ## A9.5 · a9-userset-verification — RESOLVED
 
 **File:** `acquisition/config.toml` `[camera_verify]`,

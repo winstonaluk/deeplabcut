@@ -77,7 +77,7 @@ Auto-exposure and auto-gain are the scientifically load-bearing ones: they
 re-tune continuously as the rat descends, so image appearance covaries with
 the very thing DLC is being trained to locate.
 
-## Chunk data — off as shipped
+## Chunk data — off as shipped, enabled by the app at open()
 
 | Chunk | Enabled |
 |---|---|
@@ -134,69 +134,108 @@ This is a **USB3 camera**, so the GigE-specific guidance that used to be in
 `SPINNAKER_PLAN.md` (jumbo frames, MTU, packet size, firewall exceptions) does
 not apply and has been removed.
 
-## Open hardware blocker — `UserSetLoad` is not executable
+## Resolved: the "read-only nodes" symptom is a parameter lock
 
-`UserSetLoad` and `UserSetSave` both report GenICam access mode **RO (3)**, and
-`Execute()` raises:
+**Symptom.** `UserSetLoad`, `UserSetSave`, `PixelFormat`, `Width` and `Height`
+all report GenICam access mode **RO (3)** together, and `Execute()` raises:
 
 ```
 GenICam::AccessException= Node is not writable. :
 AccessException thrown in node 'UserSetLoad' while calling 'UserSetLoad.Execute()'
 ```
 
-This is not a transient or contextual lock, as far as could be determined
-without touching the hardware:
+**Cause: another Spinnaker session has the camera's parameters latched** —
+SpinView left open, or a script that exited without `EndAcquisition()`/`DeInit()`.
+While acquisition is armed, FLIR locks the image-format nodes and the user-set
+commands *as a group*. When that session ends, every one of them returns to RW.
+Verified 2026-08-14: RO while a stream was live, RW afterwards, nothing else
+changed.
 
-- `DeviceAccessStatus` is `OpenReadWrite`; no other process holds the camera
-  (no SpinView or FLIR process running).
-- `StreamIsGrabbing` is `False`, `cam.IsStreaming()` is `False`,
-  `TLParamsLocked` is `0`.
-- The same result appears in a fresh process on the first node touched after
-  `Init()`, so it is not something an earlier probe left latched.
-- It is the same for all three sets (`Default`, `UserSet0`, `UserSet1`), so it
-  is not an "empty user set" condition.
-- `PixelFormat` is read-only in the same way, while neighbours like
-  `ExposureAuto`, `ChunkModeActive` and `AcquisitionFrameRateEnable` are freely
-  writable. Command nodes in general are fine — `TimestampLatch` and
-  `DeviceReset` both report WO and are executable.
+**This was originally misdiagnosed here** as a camera fault, on the strength of
+`DeviceAccessStatus == OpenReadWrite`, `StreamIsGrabbing == False` and
+`TLParamsLocked == 0`. Those three are **host-side state for the probing
+process** — none of them can see a *different* process holding the camera. Do
+not repeat that inference. The reliable test is simply whether the whole cluster
+of nodes is RO at once, which is what `tools/probe_camera.py`'s ACCESS MODES
+section reports.
 
-**Why it blocks A10:** invariant 7's entire startup path is `UserSetLoad` then
-verify. Until this clears, the camera keeps booting into factory defaults with
-auto-exposure on, and preflight would hard-fail every session.
+**It will recur**, so the app handles it: `SpinnakerCamera.load_user_set()`
+checks `IsWritable` before executing and surfaces "camera parameters are locked
+— another application (e.g. SpinView) may be streaming from this camera" through
+preflight, instead of letting an `AccessException` escape. `close()` always
+tears down, including on error paths, so this app does not become the thing that
+leaves the camera latched for the next run.
 
-Things to try, in order — all require someone at the rig:
+**Close SpinView before running anything that talks to the camera.**
 
-1. Power-cycle or replug the camera, then re-run `tools/probe_camera.py` and
-   check the access modes. An unclean exit can leave device registers latched.
-   (`DeviceReset` is executable and would do this in software.)
-2. Open SpinView and see whether user-set load/save is greyed out there too.
-   That separates a camera-state problem from a PySpin one.
-3. Check Teledyne for firmware newer than `1707.1.6.0` for the BFS-U3-04S2C.
-4. Confirm `UserSet1` was ever actually saved. `UserSetSave` is read-only too,
-   so it may be an empty slot — in which case `config.toml`'s
-   `user_set = "UserSet1"` currently points at nothing.
+## `UserSet1` has never been configured
 
-## What was and was not done to the camera
+Read 2026-08-14 with `tools/probe_camera.py --dump-user-sets`. `Default`,
+`UserSet0` and `UserSet1` are **identical, and all three are factory defaults**:
+`BayerRG8`, `ExposureAuto` and `GainAuto` `Continuous`, `GammaEnable` True at
+0.80, `AcquisitionFrameRateEnable` False, `ChunkModeActive` False.
 
-Probing was read-only by intent. One exception: while testing whether
-`UserSetLoad` was executable, `UserSetSelector` was set across `Default`,
-`UserSet0` and `UserSet1`. The selector only chooses which set a subsequent
-load or save would target, and **every `UserSetLoad` call failed with
-`AccessException`, so no user set was loaded and no camera setting changed**.
-The selector was returned to `UserSet0`, where it was found. `UserSetSave` is
-never called by anything in `tools/`.
+So `config.toml`'s `user_set = "UserSet1"` currently loads factory settings, and
+preflight correctly fails every `[camera_verify]` check that matters. Configuring
+it in SpinView is real outstanding work, not a formality — see the checklist in
+`acquisition/CLAUDE.md` under "Encoder tuning" and the A10 plan.
 
-`DeviceReset` was not run, the camera was not power-cycled, and acquisition was
-never started.
+**Exposure floats, which is the point.** It read 14999 µs on one probe and
+1002 µs on another, with nothing changed but ambient light and time. That is
+auto-exposure doing its job, and it is exactly the covariance that makes frame
+appearance track the animal's position on the pole. The problem is not that
+15 ms is long; it is that the value is not under anyone's control.
+
+## What has been done to the camera
+
+`tools/probe_camera.py` is read-only apart from stepping `ChunkSelector` to read
+chunk state, which it restores. `--dump-user-sets` additionally executes
+`UserSetLoad` for each set to report its contents, then reloads `UserSetDefault`
+so the camera is left as it boots.
+
+`tools/verify_a10.py` and `SpinnakerCamera.open()` **do** write to the camera:
+they enable `ChunkModeActive` and the `FrameID`/`Timestamp` chunks, set the
+stream buffer mode and depth, and set `AcquisitionMode` to `Continuous`. Chunk
+and acquisition-mode settings are device-nodemap state that a `UserSetLoad` or a
+power cycle resets; the stream buffer settings are transport-layer and are not
+persisted at all.
+
+**Nothing has ever executed `UserSetSave`.** No user set has been written by any
+tool in this repo — which is why all three still hold factory defaults.
+`DeviceReset` has not been run.
+
+## Measured under load (2026-08-14)
+
+A 60-second recording through the real pipeline —
+`SpinnakerCamera` → `CaptureController` → `BoundedFrameQueue` → `WriterThread` →
+FFmpeg — via `python tools/verify_a10.py --seconds 60`:
+
+| | |
+|---|---|
+| Frames written | **3960** in 60.0 s (**66.0 fps**, free-running) |
+| Dropped frames (queue full) | **0** |
+| Incomplete frames | **0** |
+| Frame-ID gaps | **0** |
+| Hardware timestamps | strictly increasing throughout |
+| Encoder | `h264_qsv` at `-global_quality 22`, exited 0 |
+| Output | 5.6 MB — **5.6 MB/min at 66 fps** |
+
+The pipeline sustained **more than double** the configured 30 fps with zero
+loss, which is the real evidence for invariants 3 and 10. Encoded size is far
+below the ~37 MB/min that the old 1280×720 estimate implied; at 30 fps expect
+roughly half of the 5.6 MB/min above, so a 5-minute trial lands in the low tens
+of megabytes.
+
+FFmpeg 8.1.1 is installed and **`h264_qsv` genuinely encodes on the HD 630** —
+confirmed with a real one-frame probe, not just its presence in `-encoders`.
+`hevc_qsv` and `libx264` work too.
 
 ## Still unmeasured
 
-Requires a live acquisition run, which should happen only against the settings
-actually intended for recording (i.e. after `UserSet1` is fixed):
+Needs `UserSet1` configured first, so it measures the intended configuration
+rather than the factory one:
 
-- Delivered frame rate and jitter under the real 30 fps configuration.
-- That chunk timestamps increase monotonically and frame IDs have no gaps.
-- Incomplete-frame rate over a multi-minute trial.
-- Whether `h264_qsv` is actually available — **FFmpeg is not installed on the
-  acquisition PC at all** as of this writing (`ffmpeg` is not on PATH), which
-  the app already treats as a blocking preflight failure.
+- Delivered rate and jitter once the rate is latched to 30 fps.
+- Whether frame IDs stay contiguous over a multi-minute trial (60 s is clean).
+- Encoder quality/size trade-off on real footage — `tools/measure_encoder.py`,
+  which has still never been run against an actual trial.

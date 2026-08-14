@@ -1,8 +1,13 @@
 # SpinnakerCamera implementation plan
 
-**Checkpoint A10.** The `CameraBackend` schema is settled and `spinnaker_camera.py`
-satisfies it; what remains is filling in five method bodies against real
-hardware. This document is that plan.
+**Checkpoint A10 — implemented.** `spinnaker_camera.py` now drives the real
+camera; this document is the record of *why* each step is shaped the way it is,
+and the reference for anyone changing it. Verified 2026-08-14: 60 s, 3960
+frames, zero drops, zero incomplete, no frame-ID gaps (`tools/verify_a10.py`).
+
+What remains for A10 to pass end to end is rig configuration, not code —
+`UserSet1` still holds factory defaults, so the `[camera_verify]` and frame-rate
+checks fail. See `HARDWARE.md`.
 
 Rewritten 2026-08-14 against the rig's actual camera rather than against
 generic SDK examples — every node name here was confirmed present on the
@@ -25,10 +30,11 @@ notes.
    packet-size tuning advice applies, and there is ample link headroom
    (380 MB/s limit against the ~11.7 MB/s we need).
 
-**Blocked before this can be verified end to end:** `UserSetLoad` currently
-reports access mode RO and raises `AccessException` on `Execute()`. See
-HARDWARE.md, "Open hardware blocker". Steps 2 and 3 below cannot be tested
-until someone at the rig clears that.
+**If every node reads RO**, another Spinnaker session (SpinView, or a script
+that exited without `DeInit()`) has the camera's parameters latched. Close it
+and try again — see HARDWARE.md, "Resolved: the read-only nodes symptom is a
+parameter lock". `load_user_set()` detects this and reports it rather than
+raising.
 
 ## Reference examples
 

@@ -127,11 +127,15 @@ def _camera_checks(
     checks: list[PreflightCheck] = []
 
     user_set_loaded = camera.load_user_set(user_set_name)
+    # Backends may explain *why* a load failed. The common real cause is another
+    # Spinnaker session holding the camera's parameters latched, which is
+    # trivially fixable once named and baffling when reported as "load failed".
+    reason = getattr(camera, "last_user_set_error", None) or "load failed"
     checks.append(
         PreflightCheck(
             f"UserSet {user_set_name!r} loaded",
             user_set_loaded,
-            "" if user_set_loaded else "load failed",
+            "" if user_set_loaded else reason,
         )
     )
 

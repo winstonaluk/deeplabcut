@@ -241,11 +241,13 @@ onset is never clipped by reaction time. **~23 MB** per camera per 2 s at
 
 Acquisition runs at **30 fps** (fps is a config value; the sensor can go far
 faster, but exposure time is the binding constraint). Raw rate is **11.7 MB/s**
-at 720 × 540 Mono8; encoded H.264 is a fraction of that. The old ~37 MB/min
-figure was computed for 1280 × 720 and is an over-estimate — re-measure against
-real encoded output once FFmpeg is installed, rather than substituting another
-guess. Against ~350 GB usable, transfer workflow is still essential, not a
-convenience.
+at 720 × 540 Mono8. Encoded output measured at **5.6 MB/min at 66 fps** with
+`h264_qsv`, so expect roughly half that at 30 fps — a 5-minute trial in the low
+tens of MB, far below the old ~37 MB/min figure, which was computed for
+1280 × 720. Re-measure on real footage (`tools/measure_encoder.py`) once
+`UserSet1` is configured, since a static test scene compresses optimistically.
+Transfer workflow is still worth having, but disk is not the binding
+constraint it was assumed to be.
 
 - Live free-space indicator **and estimated remaining-recording-time** from
   measured bitrate. GB free is not actionable mid-session; "47 min remaining" is.
@@ -263,13 +265,15 @@ convenience.
 Goal: smallest files that still support accurate DLC keypoints. The levers, in
 descending order of how much they actually matter:
 
-1. **Exposure time — not a codec setting at all.** The camera was found at
-   15 ms exposure. A rat descending a pole moves visibly within 15 ms, and that
-   motion blur destroys keypoint precision in a way no encoder setting can
-   recover, and no bitrate can compensate for. **Shorten exposure (single-digit
-   ms) and pay for it with light and gain, not with CRF.** Blur also makes
-   frames *harder* to compress, so this is the rare change that improves
-   quality and size together. Set it in SpinView, save to `UserSet1`.
+1. **Exposure time — not a codec setting at all.** Auto-exposure is on, so the
+   value floats: it read 15 ms on one probe and 1 ms on another with nothing
+   changed but ambient light. A rat descending a pole moves visibly within
+   15 ms, and that motion blur destroys keypoint precision in a way no encoder
+   setting recovers and no bitrate compensates for. **Fix the exposure, make it
+   short (single-digit ms), and pay for it with light and gain rather than with
+   CRF.** Blur also makes frames *harder* to compress, so this is the rare
+   change that improves quality and size together. SpinView, saved to
+   `UserSet1`.
 2. **Resolution.** 720 × 540 is already the full sensor; there is nothing to
    give back here without cropping to an ROI. If the animal occupies a
    predictable part of the frame, an ROI in `UserSet1` is the single largest
@@ -333,8 +337,14 @@ python -m app --mock
 # run against real camera
 python -m app
 
-# tests (must pass with no hardware attached)
+# tests (must pass with no hardware attached; hardware tests deselected)
 pytest
+
+# the hardware-marked subset, at the rig
+pytest -m hardware
+
+# record 60 s from the real camera and check A10's done-criteria
+python tools/verify_a10.py
 
 # read the camera and refresh HARDWARE.md (acquisition PC only; needs PySpin)
 python tools/probe_camera.py
@@ -391,4 +401,5 @@ When running headless (`claude -p`) I cannot answer questions. Therefore:
 | A8 | Storage + staging | Free-space indicator, remaining-time estimate, hard block below threshold, staging with checksum verification, confirm-gated purge. |
 | A9 | `SpinnakerCamera` scaffold | **Done.** Class scaffolded against `CameraBackend`, plan written. Superseded by the A9.5 schema pass below, which rewrote the plan against real hardware. |
 | A9.5 | Camera backend schema | **Done.** Backend reports `resolution`, `pixel_format`, `frame_rate`, `verify_settings`, `incomplete_frame_count`; preflight asserts config against all of them; writer derives geometry and pixel format from the backend; `[camera_verify]` table in config; `HARDWARE.md` records the measured camera. |
-| A10 | `SpinnakerCamera` implementation | **Requires hardware.** Fill in the five lifecycle bodies per `SPINNAKER_PLAN.md`. Done when a 60 s recording plays back at the configured rate with a monotonic timestamp sidecar, no frame-ID gaps, and zero incomplete frames. **Blocked** on `UserSetLoad` being non-executable — see `HARDWARE.md`. |
+| A10 | `SpinnakerCamera` implementation | **Code complete, verification blocked on rig config.** All five lifecycle bodies implemented and streaming from the real camera: 60 s / 3960 frames with zero drops, zero incomplete, no frame-ID gaps, monotonic hardware timestamps, `h264_qsv` output. Run `python tools/verify_a10.py`. The remaining failures are all one cause — `UserSet1` still holds factory defaults, so exposure/gain/gamma/pixel-format/frame-rate checks fail. **Needs SpinView at the rig**, then re-run. |
+| A11 | Application wiring | **Not started.** Nothing outside tests constructs a camera, `CaptureController`, `CameraRig`, or any screen; `app/__main__.py` raises `NotImplementedError` and `resolve_encoder()` is never called by the app. Every part is built and tested, but `python -m app` does not run. This composition root is what stands between the repo and lab use. |

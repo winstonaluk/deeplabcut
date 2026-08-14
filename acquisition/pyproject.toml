@@ -13,3 +13,10 @@ packages = ["app", "gui", "acquisition", "paradigms", "storage", "pose"]
 
 [tool.pytest.ini_options]
 testpaths = ["tests"]
+# Hardware tests are deselected by default so the suite passes with nothing
+# plugged in (invariant 2). Run them at the rig with `pytest -m hardware`.
+addopts = ["-m", "not hardware"]
+markers = [
+    "hardware: needs the real camera attached; deselected by default",
+    "requires_ffmpeg: spawns a real FFmpeg process; skipped when ffmpeg is absent",
+]
