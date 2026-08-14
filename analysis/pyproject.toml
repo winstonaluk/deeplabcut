@@ -1,0 +1,15 @@
+[build-system]
+requires = ["setuptools>=68"]
+build-backend = "setuptools.build_meta"
+
+[project]
+name = "pdct-analysis"
+version = "0.1.0"
+description = "Config-driven, scriptable DeepLabCut analysis pipeline for PDCT."
+requires-python = ">=3.10"
+
+[tool.setuptools]
+packages = ["pipeline", "pipeline.stages"]
+
+[tool.pytest.ini_options]
+testpaths = ["tests"]

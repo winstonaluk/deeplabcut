@@ -1,0 +1,75 @@
+# Acquisition app configuration. Every threshold, path, keybinding, and
+# encoder setting the app uses reaches code through this file -- see
+# acquisition/CLAUDE.md "Conventions". Nothing here is a literal in code.
+
+[app]
+version = "0.1.0"
+rig_id = "rig-1"
+
+[[cameras]]
+# N-camera by construction (invariant 1). One entry today; add more [[cameras]]
+# tables to add views. `name` is a human label (e.g. "lateral"), not the
+# Spinnaker serial.
+serial = "REPLACE_WITH_CAMERA_SERIAL"
+name = "lateral"
+user_set = "UserSet1"
+
+[capture]
+fps = 30
+width = 1280
+height = 720
+queue_maxsize = 120
+preview_fps = 15
+preroll_buffer_s = 2.0
+
+[encoder]
+codec = "h264_qsv"
+fallback_codec = "libx264"
+crf = 18
+pixel_format = "yuv420p"
+
+[paradigm]
+active = "pdct"
+
+[trial_timing]
+# See acquisition/CLAUDE.md "Trial state machine". All in seconds.
+min_trial_duration_s = 5
+suspicious_duration_s = 30
+max_trial_duration_s = 600
+
+[keymap]
+# key -> reason_code. New paradigms define different codes here without
+# source changes.
+F = "fall"
+Z = "freeze"
+D = "did_not_descend"
+E = "experimenter_error"
+V = "other_invalid"
+
+[reason_code_labels]
+fall = "Fell from the pole"
+freeze = "Froze partway down"
+did_not_descend = "Never initiated descent"
+experimenter_error = "Handling/placement error"
+other_invalid = "Generic; reason assigned later"
+
+[metadata]
+projects = ["pdct-pilot"]
+experimenter_initials = ["WL"]
+animal_id_regex = "^[A-Za-z0-9_-]+$"
+
+[storage]
+session_root = "./sessions"
+min_free_gb = 20
+# Optional <view> filename token; default off. Enable when more cameras are
+# added -- DLC flattens folder structure on import so filenames must stand
+# alone (see acquisition/CLAUDE.md "Files and naming").
+filename_include_view_token = false
+
+[staging]
+# Generic mounted path / rsync / robocopy target -- never institution-specific.
+target_path = ""
+checksum_algorithm = "sha256"
+
+[logging]
+level = "INFO"
