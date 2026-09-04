@@ -33,3 +33,6 @@ Thumbs.db
 /analysis/derived/
 /analysis/archive/
 *.parquet.tmp
+
+# Graphify generated knowledge graph
+graphify-out/
