@@ -135,16 +135,51 @@ def _node_value_str(nodemap: Any, name: str) -> str:
     return "<unreadable>"
 
 
+def _normalize_enum_name(name: str) -> str:
+    """Case, spaces and punctuation removed, so "User Set 1" == "UserSet1".
+
+    GenICam enum entries have a symbolic name (``UserSet1``), which is what the
+    SDK looks up, and a display name (``User Set 1``), which is what SpinView
+    shows. The one on screen is the one people copy into config.toml.
+    """
+    return "".join(ch for ch in name.lower() if ch.isalnum())
+
+
+def _find_enum_entry(node: Any, entry_name: str) -> Any:
+    """The readable entry named ``entry_name`` -- by exact symbolic name first,
+    then by symbolic or display name compared loosely. None if there is none."""
+    import PySpin
+
+    try:
+        entry = node.GetEntryByName(entry_name)
+    except PySpin.SpinnakerException:
+        entry = None
+    if entry is not None and PySpin.IsReadable(PySpin.CEnumEntryPtr(entry)):
+        return PySpin.CEnumEntryPtr(entry)
+
+    wanted = _normalize_enum_name(entry_name)
+    for candidate in node.GetEntries():
+        candidate = PySpin.CEnumEntryPtr(candidate)
+        if not PySpin.IsReadable(candidate):
+            continue
+        names = (candidate.GetSymbolic(), candidate.GetDisplayName())
+        if wanted in {_normalize_enum_name(name) for name in names}:
+            logger.info("%r resolved to enum entry %r (displayed as %r)", entry_name, *names)
+            return candidate
+    return None
+
+
 def _set_enum(nodemap: Any, node_name: str, entry_name: str) -> None:
     import PySpin
 
     node = PySpin.CEnumerationPtr(nodemap.GetNode(node_name))
     if not PySpin.IsReadable(node) or not PySpin.IsWritable(node):
         raise CameraError(f"{node_name} is not writable -- {_LOCKED_PARAMS_HINT}")
-    entry = node.GetEntryByName(entry_name)
-    if entry is None or not PySpin.IsReadable(PySpin.CEnumEntryPtr(entry)):
-        raise CameraError(f"{node_name} has no entry {entry_name!r}")
-    node.SetIntValue(PySpin.CEnumEntryPtr(entry).GetValue())
+    entry = _find_enum_entry(node, entry_name)
+    if entry is None:
+        available = [PySpin.CEnumEntryPtr(e).GetSymbolic() for e in node.GetEntries()]
+        raise CameraError(f"{node_name} has no entry {entry_name!r} (available: {available})")
+    node.SetIntValue(entry.GetValue())
 
 
 class SpinnakerCamera(CameraBackend):

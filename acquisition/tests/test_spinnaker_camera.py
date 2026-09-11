@@ -14,6 +14,7 @@ at the rig with:
 from __future__ import annotations
 
 import time
+from pathlib import Path
 
 import numpy as np
 import pytest
@@ -24,10 +25,13 @@ from acquisition.spinnaker_camera import (
     REQUIRED_CHUNKS,
     STREAM_BUFFER_HANDLING_MODE,
     SpinnakerCamera,
+    _normalize_enum_name,
     _values_match,
 )
+from app.config import load_config
 
 SERIAL = "22514545"  # the rig camera; see acquisition/HARDWARE.md
+CONFIG_PATH = Path(__file__).resolve().parent.parent / "config.toml"
 
 
 # -- structural, no hardware --------------------------------------------------
@@ -104,6 +108,19 @@ def test_node_value_comparison_tolerates_formatting_but_not_difference(actual, e
     assert _values_match(actual, expected) is matches
 
 
+@pytest.mark.parametrize(
+    "configured,entry,matches",
+    [
+        ("UserSet1", "UserSet1", True),
+        ("User Set 1", "UserSet1", True),  # the name SpinView displays
+        ("user_set_1", "UserSet1", True),
+        ("User Set 1", "UserSet0", False),
+    ],
+)
+def test_user_set_names_match_in_either_spelling(configured, entry, matches):
+    assert (_normalize_enum_name(configured) == _normalize_enum_name(entry)) is matches
+
+
 # -- hardware -----------------------------------------------------------------
 
 
@@ -118,8 +135,11 @@ def camera():
 @pytest.mark.hardware
 def test_open_reports_real_geometry_and_is_idempotent(camera):
     camera.open()  # second open must be a no-op, not an error
-    width, height = camera.resolution
-    assert (width, height) == (720, 540)
+    config = load_config(CONFIG_PATH)
+    assert camera.load_user_set(config.cameras[0].user_set), camera.last_user_set_error
+    # Against config rather than a literal: the rig records a ROI saved in the
+    # user set, not the full 720x540 sensor.
+    assert camera.resolution == config.capture.resolution
     assert camera.frame_rate > 0
 
 
@@ -169,6 +189,14 @@ def test_verify_settings_reads_the_camera_back(camera):
     checks = camera.verify_settings({"SensorShutterMode": "Global", "TriggerMode": "Off"})
     assert [c.node for c in checks] == ["SensorShutterMode", "TriggerMode"]
     assert all(c.passed for c in checks), [c.describe() for c in checks]
+
+
+@pytest.mark.hardware
+def test_load_user_set_accepts_the_name_spinview_displays(camera):
+    """SpinView shows "User Set 1"; the node's entry is "UserSet1"."""
+    assert camera.load_user_set("User Set 1") is True, camera.last_user_set_error
+    assert camera.load_user_set("NoSuchSet") is False
+    assert "NoSuchSet" in (camera.last_user_set_error or "")
 
 
 @pytest.mark.hardware

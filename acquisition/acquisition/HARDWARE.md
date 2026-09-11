@@ -168,7 +168,36 @@ leaves the camera latched for the next run.
 
 **Close SpinView before running anything that talks to the camera.**
 
-## `UserSet1` has never been configured
+## `UserSet1` as configured (2026-09-10)
+
+Set in SpinView, saved to `UserSet1`, and made the power-on default. Read back
+after `UserSetLoad` on 2026-09-10; `tools/verify_a10.py` passes every
+`[camera_verify]` check against it.
+
+| Node | Value | Note |
+|---|---|---|
+| `UserSetDefault` | `UserSet1` | The camera now boots into the configured set |
+| `Width` × `Height` | **680 × 460** | ROI at offset (0, 0) inside the 720 × 540 sensor; may become square later |
+| `PixelFormat` | `Mono8` | |
+| `ExposureAuto` / `ExposureTime` | `Off` / **8.94 ms** | Fixed and single-digit ms, as "Encoder tuning" asks |
+| `GainAuto` / `Gain` | `Off` / **34.7 dB** | Fixed, but high -- see below |
+| `GammaEnable` | `False` | |
+| `BlackLevel` | 10.0 | 0.0 at factory |
+| `AcquisitionFrameRateEnable` / rate | `True` / **29.996** | Latched; the resulting rate matches |
+| `SensorShutterMode` / `TriggerMode` | `Global` / `Off` | |
+
+SpinView displays the set as **"User Set 1"**; the node's symbolic name is
+`UserSet1`. `config.toml` accepts either -- `SpinnakerCamera` matches enum
+entries by symbolic or display name, ignoring case and spacing.
+
+**Gain is the open item.** 34.7 dB is roughly 54× amplification. Recordings
+now run at **~55–60 MB/min at 30 fps**, about ten times the 5.6 MB/min
+measured at factory settings (10.8 dB gain, 66 fps), so a 5-minute trial is
+~300 MB. Sensor noise does not compress, and gain is the most likely cause.
+More light and less gain is the lever: it cuts file size and the noise in the
+DLC training data together. Re-measure after changing it.
+
+## History: `UserSet1` held factory defaults until 2026-09-10
 
 Read 2026-08-14 with `tools/probe_camera.py --dump-user-sets`. `Default`,
 `UserSet0` and `UserSet1` are **identical, and all three are factory defaults**:
@@ -200,11 +229,31 @@ and acquisition-mode settings are device-nodemap state that a `UserSetLoad` or a
 power cycle resets; the stream buffer settings are transport-layer and are not
 persisted at all.
 
-**Nothing has ever executed `UserSetSave`.** No user set has been written by any
-tool in this repo — which is why all three still hold factory defaults.
-`DeviceReset` has not been run.
+**No tool in this repo executes `UserSetSave`.** `UserSet1` was written by hand
+in SpinView on 2026-09-10; `Default` and `UserSet0` still hold factory
+defaults. `DeviceReset` has not been run.
 
-## Measured under load (2026-08-14)
+## Measured under load (2026-09-10, configured `UserSet1`)
+
+`python tools/verify_a10.py --seconds 60` -- **A10: PASS**, every check:
+
+| | |
+|---|---|
+| Preflight | all 13 checks pass: every `[camera_verify]` node, 680 × 460, 30.00 fps |
+| Frames written | **1801** in 60.0 s vs 1800 expected |
+| Rate from hardware timestamps | **30.00 fps** |
+| Dropped / incomplete / frame-ID gaps | **0 / 0 / 0** |
+| Encoder | `h264_qsv` at `-global_quality 22`, fragmented MP4 |
+| Output | **55.5 MB/min** |
+
+Also run through `RecordingSessionController` -- the layer the GUI drives --
+after preflight, for two trials (35 s and 8 s, one flagged mid-trial). The 2 s
+pre-roll was prepended with frame IDs contiguous across the boundary;
+hardware-clock rate 29.996 fps with inter-frame s.d. under 1 µs (max 33.34 ms);
+`achieved_fps` 29.996 on both; every frame decodable and file duration matching
+the hardware-timestamp span.
+
+## Measured under load (2026-08-14, factory settings)
 
 A 60-second recording through the real pipeline —
 `SpinnakerCamera` → `CaptureController` → `BoundedFrameQueue` → `WriterThread` →
@@ -232,10 +281,8 @@ confirmed with a real one-frame probe, not just its presence in `-encoders`.
 
 ## Still unmeasured
 
-Needs `UserSet1` configured first, so it measures the intended configuration
-rather than the factory one:
+Rate and jitter at a latched 30 fps are now measured (above). Still open:
 
-- Delivered rate and jitter once the rate is latched to 30 fps.
-- Whether frame IDs stay contiguous over a multi-minute trial (60 s is clean).
+- Whether frame IDs stay contiguous over a full 5-minute trial (60 s is clean).
 - Encoder quality/size trade-off on real footage — `tools/measure_encoder.py`,
   which has still never been run against an actual trial.

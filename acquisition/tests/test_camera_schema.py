@@ -273,7 +273,8 @@ def test_writer_rejects_a_pixel_format_it_was_not_configured_for(tmp_path):
 def test_config_matches_the_rig_camera():
     """These values were read off the camera, not chosen. See HARDWARE.md."""
     config = load_config(CONFIG_PATH)
-    assert config.capture.resolution == (720, 540)
+    # The ROI saved in UserSet1 (2026-09-10) inside the 720x540 sensor.
+    assert config.capture.resolution == (680, 460)
     assert config.capture.source_pixel_format is PixelFormat.MONO8
     assert config.capture.stream_buffer_count >= 30  # >= 1 s of slack at 30 fps
 
@@ -344,6 +345,9 @@ def test_writer_command_carries_the_right_quality_flag(tmp_path, codec, flag):
     assert cmd[cmd.index("-video_size") + 1] == "720x540"
     assert cmd[cmd.index("-pixel_format") + 1] == "gray8"
     assert cmd[cmd.index("-pix_fmt") + 1] == "yuv420p"
+    # Fragmented, so a crash mid-trial still leaves a playable file (writer.py).
+    assert cmd[cmd.index("-movflags") + 1] == "+frag_keyframe+empty_moov+default_base_moof"
+    assert cmd[-1] == str(tmp_path / "out.mp4")
 
 
 def test_keyframe_interval_becomes_a_gop_in_frames():

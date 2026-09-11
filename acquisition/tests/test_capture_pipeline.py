@@ -77,7 +77,71 @@ def test_mock_capture_produces_playable_h264(tmp_path):
 
     rows = writer.timestamp_rows
     assert [r.frame_index for r in rows] == list(range(len(rows)))
-    assert [r.frame_id for r in rows] == sorted(r.frame_id for r in rows)
+    ids = [r.frame_id for r in rows]
+    assert ids == list(range(ids[0], ids[0] + len(ids))), "frame IDs not contiguous"
+
+
+def test_begin_trial_hands_off_preroll_and_live_frames_without_gap_or_duplicate():
+    """The pre-roll snapshot and the frames queued after it must be contiguous.
+    Snapshotting and attaching as two separate steps let a frame arriving in
+    between land in neither (an ID gap) or in both (a duplicate)."""
+    fps = 1000  # a 1 ms frame interval makes any handoff window likely to be hit
+    camera = MockCamera(serial="mock-handoff", width=8, height=8, fps=fps)
+    controller = CaptureController(camera, preroll_duration_s=0.02, fps=fps)
+    controller.start()
+    try:
+        time.sleep(0.05)
+        for attempt in range(200):
+            sink = BoundedFrameQueue(maxsize=1000)
+            preroll = controller.begin_trial(sink)
+            time.sleep(0.002)
+            controller.detach_sink()
+            queued = []
+            while sink.qsize():
+                queued.append(sink.get(timeout=0).frame_id)
+            ids = [f.frame_id for f in preroll] + queued
+            assert ids == list(range(ids[0], ids[0] + len(ids))), (
+                f"attempt {attempt}: pre-roll ended at {preroll[-1].frame_id}, "
+                f"queue began at {queued[:1]}"
+            )
+    finally:
+        controller.stop()
+
+
+@pytest.mark.requires_ffmpeg
+def test_a_recording_cut_off_mid_trial_still_decodes(tmp_path):
+    """Simulates a crash mid-trial by truncating the file FFmpeg wrote. A plain
+    MP4 is unreadable without the index it writes last; the writer's
+    fragmented MP4 must still decode up to the cut."""
+    width = height = 64
+    frame_queue = BoundedFrameQueue(maxsize=400)
+    output = tmp_path / "t001.mp4"
+    writer = WriterThread(
+        frame_queue=frame_queue, output_path=output, width=width, height=height,
+        fps=30, codec="libx264", crf=28, pixel_format="yuv420p", gop=10,
+    )
+    rng = np.random.default_rng(0)
+    for i in range(300):
+        frame_queue.put_or_drop(Frame(
+            image=rng.integers(0, 256, (height, width), dtype=np.uint8),
+            hardware_timestamp_ns=i, frame_id=i,
+        ))
+    writer.start()
+    writer.stop()
+    writer.join(timeout=30)
+    writer.raise_if_failed()
+
+    data = output.read_bytes()
+    crashed = tmp_path / "crashed.mp4"
+    crashed.write_bytes(data[: len(data) * 6 // 10])
+    result = subprocess.run(
+        ["ffprobe", "-v", "quiet", "-select_streams", "v:0", "-count_frames",
+         "-show_entries", "stream=nb_read_frames", "-of", "json", str(crashed)],
+        capture_output=True, timeout=30,
+    )
+    streams = json.loads(result.stdout or b"{}").get("streams", [])
+    decoded = int(streams[0].get("nb_read_frames", 0)) if streams else 0
+    assert decoded > 100, f"a file cut at 60% decoded only {decoded} of 300 frames"
 
 
 def test_queue_drops_and_counts_under_backpressure():

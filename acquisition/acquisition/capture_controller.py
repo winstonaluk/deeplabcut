@@ -3,9 +3,9 @@ latest-frame slot for preview, and (while a trial is recording) the writer's
 bounded queue.
 
 Recording integrity is independent of everything else (invariant 4): this
-class has no dependency on the GUI or trial state machine. Something else
-(A3's TrialStateMachine, wired at A5/A6) calls ``attach_sink`` /
-``detach_sink`` around a trial's lifetime.
+class has no dependency on the GUI or trial state machine.
+RecordingSessionController calls ``begin_trial`` / ``detach_sink`` around a
+trial's lifetime.
 """
 
 from __future__ import annotations
@@ -29,6 +29,14 @@ class CaptureController:
         self.preroll = PreRollBuffer(duration_s=preroll_duration_s, fps=fps)
         self._latest_frame_lock = threading.Lock()
         self._latest_frame: Frame | None = None
+        # Guards the pre-roll/sink handoff. _on_frame pushes to the pre-roll
+        # and forwards to the sink under this one lock, and begin_trial
+        # snapshots and attaches under it too, so each frame lands in exactly
+        # one of "the snapshot" or "the queue": never neither (a frame-ID gap
+        # at the pre-roll boundary) and never both (a duplicated frame).
+        # Holding it in the capture callback does not block capture
+        # (invariant 3): everything inside is non-blocking, and begin_trial
+        # holds it only long enough to copy the pre-roll's frame references.
         self._sink_lock = threading.Lock()
         self._sink: BoundedFrameQueue | None = None
 
@@ -40,8 +48,23 @@ class CaptureController:
         self._camera.stop_streaming()
         self._camera.close()
 
+    def begin_trial(self, sink: BoundedFrameQueue) -> list[Frame]:
+        """Attaches ``sink`` and returns the pre-roll to prepend, atomically.
+
+        The returned frames and the frames subsequently delivered to ``sink``
+        are contiguous -- none missing between them, none in both. Calling
+        ``preroll.snapshot()`` and ``attach_sink()`` separately does not
+        guarantee that: a frame arriving between the two calls is lost or
+        duplicated.
+        """
+        with self._sink_lock:
+            frames = self.preroll.snapshot()
+            self._sink = sink
+        return frames
+
     def attach_sink(self, sink: BoundedFrameQueue) -> None:
-        """Begins forwarding frames to ``sink`` (a trial's writer queue)."""
+        """Begins forwarding frames to ``sink`` with no pre-roll handoff.
+        A trial with a pre-roll uses :meth:`begin_trial` instead."""
         with self._sink_lock:
             self._sink = sink
 
@@ -74,8 +97,7 @@ class CaptureController:
     def _on_frame(self, frame: Frame) -> None:
         with self._latest_frame_lock:
             self._latest_frame = frame
-        self.preroll.push(frame)
         with self._sink_lock:
-            sink = self._sink
-        if sink is not None:
-            sink.put_or_drop(frame)
+            self.preroll.push(frame)
+            if self._sink is not None:
+                self._sink.put_or_drop(frame)

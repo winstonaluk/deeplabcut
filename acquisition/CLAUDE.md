@@ -65,6 +65,8 @@ top-down) come later.
 - Sensor is **720 × 540** (Sony IMX287, 0.4 MP) — *not* 1280 × 720. The old
   "720p60" note was a misread of "720 × 540"; every figure derived from it was
   wrong-high.
+- `UserSet1` records a **680 × 460 ROI** within it (saved 2026-09-10), and
+  `config.toml` matches. The ROI may become square later.
 - It is a **colour** sensor (`BayerRG8`). We record Mono8, which on this camera
   is luma derived from the Bayer mosaic rather than a native mono readout.
 - Python is pinned to **3.10** by the `cp310` PySpin wheel; numpy must be **< 2**.
@@ -201,8 +203,8 @@ confirmation, decrementing the counter. Every hotkey also has a large on-screen 
 
 Rolling in-RAM buffer of the most recent **2 s** (config) per camera, running
 whenever streaming — not just during trials. Prepended on trial start so descent
-onset is never clipped by reaction time. **~23 MB** per camera per 2 s at
-720 × 540 Mono8 / 30 fps.
+onset is never clipped by reaction time. **~19 MB** per camera per 2 s at
+680 × 460 Mono8 / 30 fps.
 
 ## Files and naming
 
@@ -240,14 +242,14 @@ onset is never clipped by reaction time. **~23 MB** per camera per 2 s at
 ## Storage
 
 Acquisition runs at **30 fps** (fps is a config value; the sensor can go far
-faster, but exposure time is the binding constraint). Raw rate is **11.7 MB/s**
-at 720 × 540 Mono8. Encoded output measured at **5.6 MB/min at 66 fps** with
-`h264_qsv`, so expect roughly half that at 30 fps — a 5-minute trial in the low
-tens of MB, far below the old ~37 MB/min figure, which was computed for
-1280 × 720. Re-measure on real footage (`tools/measure_encoder.py`) once
-`UserSet1` is configured, since a static test scene compresses optimistically.
-Transfer workflow is still worth having, but disk is not the binding
-constraint it was assumed to be.
+faster, but exposure time is the binding constraint). Raw rate is **9.4 MB/s**
+at the 680 × 460 Mono8 ROI. With the configured `UserSet1`, encoded output
+measures **~55–60 MB/min** with `h264_qsv` -- a 5-minute trial is ~300 MB, ten
+times the 5.6 MB/min measured at factory settings. The most likely cause is
+gain at 34.7 dB: sensor noise does not compress. Bringing gain down (with more
+light) is the lever; re-measure after. At today's rate the ~400 GB free holds
+roughly 110–120 hours of recording, so disk is a managed resource rather than
+the binding constraint, and the transfer workflow still matters.
 
 - Live free-space indicator **and estimated remaining-recording-time** from
   measured bitrate. GB free is not actionable mid-session; "47 min remaining" is.
@@ -355,8 +357,8 @@ python tools/measure_encoder.py REFERENCE.mp4
 
 Tests that spawn FFmpeg are marked `requires_ffmpeg` and skip automatically when
 it isn't on PATH, so a missing external binary reports as one named skip rather
-than eleven identical tracebacks. **FFmpeg is not currently installed on the
-acquisition PC.**
+than eleven identical tracebacks. FFmpeg 8.1.1 (with `h264_qsv`) is installed on the
+acquisition PC.
 
 ## Conventions
 
@@ -401,5 +403,5 @@ When running headless (`claude -p`) I cannot answer questions. Therefore:
 | A8 | Storage + staging | Free-space indicator, remaining-time estimate, hard block below threshold, staging with checksum verification, confirm-gated purge. |
 | A9 | `SpinnakerCamera` scaffold | **Done.** Class scaffolded against `CameraBackend`, plan written. Superseded by the A9.5 schema pass below, which rewrote the plan against real hardware. |
 | A9.5 | Camera backend schema | **Done.** Backend reports `resolution`, `pixel_format`, `frame_rate`, `verify_settings`, `incomplete_frame_count`; preflight asserts config against all of them; writer derives geometry and pixel format from the backend; `[camera_verify]` table in config; `HARDWARE.md` records the measured camera. |
-| A10 | `SpinnakerCamera` implementation | **Code complete, verification blocked on rig config.** All five lifecycle bodies implemented and streaming from the real camera: 60 s / 3960 frames with zero drops, zero incomplete, no frame-ID gaps, monotonic hardware timestamps, `h264_qsv` output. Run `python tools/verify_a10.py`. The remaining failures are all one cause — `UserSet1` still holds factory defaults, so exposure/gain/gamma/pixel-format/frame-rate checks fail. **Needs SpinView at the rig**, then re-run. |
+| A10 | `SpinnakerCamera` implementation | **Done, verified 2026-09-10.** `python tools/verify_a10.py` passes every check against the configured `UserSet1` (680 × 460 ROI, 30 fps latched): 1801 frames in 60 s, zero drops, incomplete frames or frame-ID gaps, monotonic hardware timestamps, `h264_qsv` fragmented MP4. `pytest -m hardware` 6/6. Also verified end to end through `RecordingSessionController` with preflight and pre-roll. |
 | A11 | Application wiring | **Not started.** Nothing outside tests constructs a camera, `CaptureController`, `CameraRig`, or any screen; `app/__main__.py` raises `NotImplementedError` and `resolve_encoder()` is never called by the app. Every part is built and tested, but `python -m app` does not run. This composition root is what stands between the repo and lab use. |

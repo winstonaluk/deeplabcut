@@ -21,6 +21,20 @@ from schema.timestamps import TimestampRow
 
 logger = logging.getLogger(__name__)
 
+# A plain MP4 writes its index (the moov atom) only when FFmpeg closes the file
+# cleanly. A crash, power cut or killed process mid-trial leaves no index, and
+# the whole trial is unreadable. Fragmented MP4 writes a self-contained fragment
+# at every keyframe, so a truncated file still plays up to the last complete
+# one. Measured: cut at 60%, a fragmented file decoded 174 of 300 frames and a
+# plain one decoded none ("moov atom not found").
+#
+# Cost: the container no longer stores a frame count (ffprobe's nb_frames reads
+# N/A). Duration is exact and decoding counts every frame, and OpenCV -- which
+# DeepLabCut reads video through -- derives the count from duration x fps when
+# the container has none. The timestamp sidecar remains the authoritative count.
+FRAGMENTED_MP4_FLAGS = "+frag_keyframe+empty_moov+default_base_moof"
+_FRAGMENTABLE_SUFFIXES = (".mp4", ".mov", ".m4v")
+
 
 class WriterError(RuntimeError):
     """FFmpeg exited non-zero. Carries its stderr tail for diagnostics."""
@@ -128,7 +142,10 @@ class WriterThread(threading.Thread):
             cmd += ["-preset", self._preset]
         if self._gop:
             cmd += ["-g", str(self._gop)]
-        cmd += ["-pix_fmt", self._pixel_format, str(self._output_path)]
+        cmd += ["-pix_fmt", self._pixel_format]
+        if self._output_path.suffix.lower() in _FRAGMENTABLE_SUFFIXES:
+            cmd += ["-movflags", FRAGMENTED_MP4_FLAGS]
+        cmd.append(str(self._output_path))
         return cmd
 
     def run(self) -> None:

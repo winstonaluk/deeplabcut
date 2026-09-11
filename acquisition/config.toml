@@ -12,16 +12,18 @@ rig_id = "rig-1"
 # Spinnaker serial.
 serial = "22514545"  # Blackfly S BFS-U3-04S2C; see acquisition/HARDWARE.md
 name = "lateral"
+# The symbolic name ("UserSet1") or the name SpinView displays ("User Set 1").
 user_set = "UserSet1"
 
 [capture]
 fps = 30
-# 720x540 is the BFS-U3-04S2C's full sensor (Sony IMX287, 0.4 MP) -- NOT
-# 1280x720. The "720p" in the hardware notes was a misread of "720x540".
-# Preflight blocks the session if these disagree with what the camera
-# reports; see acquisition/acquisition/HARDWARE.md.
-width = 720
-height = 540
+# The ROI saved in UserSet1 (2026-09-10), inside the BFS-U3-04S2C's 720x540
+# full sensor (Sony IMX287, 0.4 MP -- NOT 1280x720; the "720p" in the old
+# hardware notes was a misread of "720x540"). Preflight blocks the session if
+# these disagree with what the camera reports; see
+# acquisition/acquisition/HARDWARE.md.
+width = 680
+height = 460
 # Blocking tolerance, in fps, on the camera's reported rate vs `fps` above.
 fps_tolerance = 0.5
 queue_maxsize = 120

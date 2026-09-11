@@ -10,14 +10,16 @@ import pytest
 
 from acquisition.capture_controller import CaptureController
 from acquisition.mock_camera import MockCamera
-from acquisition.recording_session import CameraRig, RecordingSessionController
+from acquisition.recording_session import CameraRig, RecordingSessionController, hardware_fps
 from acquisition.trial_state_machine import KeypressStopCondition, TrialPhase, TrialStateMachine, TrialToggleAction
+from acquisition.writer import WriterError
 from app.config import (
     CaptureConfig,
     EncoderConfig,
     StorageConfig,
     TrialTimingConfig,
 )
+from schema.timestamps import TimestampRow, read_timestamps_csv
 
 FAST_TIMING = TrialTimingConfig(min_trial_duration_s=0.05, suspicious_duration_s=0.2, max_trial_duration_s=5.0)
 
@@ -219,5 +221,81 @@ def test_dropped_frame_count_aggregates_across_cameras(tmp_path):
         time.sleep(0.3)
         controller.toggle_trial()
         assert controller.dropped_frame_count >= 0  # aggregated, not per-camera-only
+    finally:
+        _teardown(rigs)
+
+
+def test_hardware_fps_is_measured_on_the_camera_clock():
+    period_ns = 33_333_333  # 30 fps
+    rows = [TimestampRow(frame_index=i, hardware_timestamp_ns=i * period_ns, frame_id=i) for i in range(31)]
+    assert hardware_fps(rows) == pytest.approx(30.0, rel=1e-6)
+    # A dropped frame is one longer interval, so it lowers the achieved rate.
+    assert hardware_fps(rows[:10] + rows[11:]) < 30.0
+    assert hardware_fps(rows[:1]) == 0.0
+    assert hardware_fps([]) == 0.0
+
+
+@pytest.mark.requires_ffmpeg
+def test_achieved_fps_is_not_inflated_by_the_preroll(tmp_path):
+    """Pre-roll frames are in the file but precede the trial's start, so
+    counting them against the trial's duration overstated achieved_fps --
+    31.7 fps on a 35 s trial and 37.3 on an 8 s one, from a camera running at
+    29.996. Analysis stage 1 checks achieved_fps against the nominal rate."""
+    controller, rigs = _make_controller(tmp_path)
+    try:
+        time.sleep(0.2)  # fill the 0.1 s pre-roll
+        controller.toggle_trial()
+        time.sleep(0.3)
+        controller.toggle_trial()
+
+        record = controller.trial_records()[0]
+        _, rows = read_timestamps_csv(next(tmp_path.glob("*_timestamps.csv")))
+        assert record.achieved_fps == pytest.approx(hardware_fps(rows))
+        # The old formula: every written frame over the trial's own duration.
+        assert record.achieved_fps < record.n_frames / record.duration_s
+    finally:
+        _teardown(rigs)
+
+
+@pytest.mark.requires_ffmpeg
+def test_sidecar_frame_ids_are_contiguous_across_the_preroll_boundary(tmp_path):
+    controller, rigs = _make_controller(tmp_path)
+    try:
+        time.sleep(0.2)  # fill the pre-roll so the file starts with it
+        controller.toggle_trial()
+        time.sleep(0.3)
+        controller.toggle_trial()
+
+        _, rows = read_timestamps_csv(next(tmp_path.glob("*_timestamps.csv")))
+        ids = [r.frame_id for r in rows]
+        assert len(ids) > rigs[0].controller.preroll.maxlen  # pre-roll plus live frames
+        assert ids == list(range(ids[0], ids[0] + len(ids))), "gap or duplicate in frame IDs"
+    finally:
+        _teardown(rigs)
+
+
+@pytest.mark.requires_ffmpeg
+def test_one_camera_failing_does_not_cost_the_other_cameras_trial(tmp_path):
+    controller, rigs = _make_controller(tmp_path, n_cameras=2, include_view_token=True)
+    try:
+        controller.toggle_trial()
+        time.sleep(0.3)
+        failing, healthy = rigs[0].writer, rigs[1].writer
+
+        def fail() -> None:
+            raise WriterError("simulated ffmpeg failure on cam0")
+
+        failing.raise_if_failed = fail
+
+        with pytest.raises(WriterError, match="cam0"):
+            controller.toggle_trial()
+
+        # The healthy camera was stopped and finalised, not left recording...
+        assert not healthy.is_alive()
+        assert all(rig.writer is None for rig in rigs)
+        assert len(list(tmp_path.glob("*_timestamps.csv"))) == 2
+        # ...and the trial is on record despite the failure.
+        assert [r.trial_number for r in controller.trial_records()] == [1]
+        assert (tmp_path / "trials.csv").exists()
     finally:
         _teardown(rigs)
