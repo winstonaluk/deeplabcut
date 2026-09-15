@@ -34,5 +34,22 @@ Thumbs.db
 /analysis/archive/
 *.parquet.tmp
 
-# Graphify generated knowledge graph
-graphify-out/
+# Graphify knowledge graph. The queryable graph, the report, the wiki and the
+# extraction cache are tracked so a fresh clone can read and query the graph
+# without re-running extraction. Everything else regenerates locally.
+graphify-out/*
+!graphify-out/GRAPH_REPORT.md
+!graphify-out/graph.json
+!graphify-out/manifest.json
+!graphify-out/wiki/
+!graphify-out/cache/
+# Only the semantic cache (212 KB) is tracked -- it is the expensive LLM
+# extraction of docs/PDFs/images. The AST cache rebuilds for free and churns on
+# every code edit, so it stays out.
+graphify-out/cache/ast/
+graphify-out/cache/last_query_stamp
+graphify-out/cache/stat-index.json
+# graph.html is a 1.8 MB generated viewer GitHub will not render; rebuild it
+# with `graphify export html`. Dated directories are per-run snapshots.
+graphify-out/graph.html
+graphify-out/[0-9][0-9][0-9][0-9]-[0-9][0-9]-[0-9][0-9]/
