@@ -30,8 +30,12 @@ class ConfigError(ValueError):
 @dataclass(frozen=True)
 class CameraConfig:
     serial: str
-    name: str
+    name: str  # the view tag; becomes the <view> filename token and schema column
     user_set: str
+    # Which CameraBackend to construct -- see acquisition/camera_registry.py.
+    # Defaults to the real camera so a config that predates this key keeps
+    # meaning what it meant; `--mock` overrides every camera at composition.
+    type: str = "spinnaker"
 
 
 @dataclass(frozen=True)
@@ -178,7 +182,12 @@ def load_config(path: str | Path) -> AppConfig:
         raise ConfigError(f"{path}: [[cameras]] must list at least one camera")
 
     cameras = tuple(
-        CameraConfig(serial=c["serial"], name=c["name"], user_set=c["user_set"])
+        CameraConfig(
+            serial=c["serial"],
+            name=c["name"],
+            user_set=c["user_set"],
+            type=c.get("type", "spinnaker"),
+        )
         for c in raw["cameras"]
     )
 

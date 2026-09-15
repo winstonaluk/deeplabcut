@@ -12,6 +12,9 @@ rig_id = "rig-1"
 # schema. `name` is a human label, not the Spinnaker serial.
 serial = "22514545"  # Blackfly S BFS-U3-04S2C; see acquisition/HARDWARE.md
 name = "top_down"
+# Which backend to construct -- see acquisition/camera_registry.py. `--mock`
+# overrides this for every camera, so the mock path needs no config edit.
+type = "spinnaker"
 # The symbolic name ("UserSet1") or the name SpinView displays ("User Set 1").
 user_set = "UserSet1"
 

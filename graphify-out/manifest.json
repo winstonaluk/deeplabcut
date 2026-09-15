@@ -1,9 +1,9 @@
 {
   ".claude/settings.local.json": {
-    "mtime": 1786318517.580751,
-    "seen": 1788565447.9697807,
-    "ast_hash": "82f06175018d137161fe99c7b764c166",
-    "semantic_hash": "82f06175018d137161fe99c7b764c166"
+    "mtime": 1789514241.7567048,
+    "seen": 1789514972.3441339,
+    "ast_hash": "f797c44911bc1ced43da989aed5e2a9a",
+    "semantic_hash": ""
   },
   ".vscode/settings.json": {
     "mtime": 1786318732.3133419,
@@ -96,16 +96,16 @@
     "semantic_hash": "9ef054b9b944ecbbdf49e42892b35fd2"
   },
   "acquisition/app/__main__.py": {
-    "mtime": 1786729933.2208142,
-    "seen": 1788565447.9697807,
-    "ast_hash": "2220cac4531e06e014460f533a12b65a",
-    "semantic_hash": "2220cac4531e06e014460f533a12b65a"
+    "mtime": 1789514601.1943219,
+    "seen": 1789514972.3441339,
+    "ast_hash": "89309540e905fe2097a5fff1b4c7b744",
+    "semantic_hash": ""
   },
   "acquisition/app/config.py": {
-    "mtime": 1786733550.1584666,
-    "seen": 1788565447.9697807,
-    "ast_hash": "c3dd554bccd22d157360d651541e365a",
-    "semantic_hash": "c3dd554bccd22d157360d651541e365a"
+    "mtime": 1789514392.4215744,
+    "seen": 1789514972.3441339,
+    "ast_hash": "c4486e8c374ee2428a7dde5061c9f13c",
+    "semantic_hash": ""
   },
   "acquisition/gui/__init__.py": {
     "mtime": 1786729933.2240207,
@@ -684,10 +684,10 @@
     "semantic_hash": ""
   },
   "OVERNIGHT_REPORT.md": {
-    "mtime": 1786729933.2075882,
-    "seen": 1788565447.9697807,
-    "ast_hash": "11d6add1ad8811f32a053da6099c0ff8",
-    "semantic_hash": "11d6add1ad8811f32a053da6099c0ff8"
+    "mtime": 1789431459.7503436,
+    "seen": 1789514972.3441339,
+    "ast_hash": "3f922b1bdaad7f7a9ab74b0f644787f2",
+    "semantic_hash": ""
   },
   "QUESTIONS.md": {
     "mtime": 1786735856.6410108,
@@ -696,9 +696,9 @@
     "semantic_hash": "56a5df1fdc9e76760c8df5f015ac2d65"
   },
   "acquisition/CLAUDE.md": {
-    "mtime": 1789431184.2688088,
-    "seen": 1789431434.2218747,
-    "ast_hash": "8de44ce2d05598a88ec463f37fb8d6e6",
+    "mtime": 1789514945.2468996,
+    "seen": 1789514972.3441339,
+    "ast_hash": "d2a7521f13bf712528f3ec1aded3803b",
     "semantic_hash": ""
   },
   "acquisition/acquisition/HARDWARE.md": {
@@ -732,10 +732,10 @@
     "semantic_hash": "a555ae58d8d1b058127e4da7f7abbfe3"
   },
   "claude_code_prompt_behavior_acquisition_gui.md": {
-    "mtime": 1786387948.4749346,
-    "seen": 1788565447.9697807,
-    "ast_hash": "18e4863e2fa1f6b73ce3509e2de701c3",
-    "semantic_hash": "18e4863e2fa1f6b73ce3509e2de701c3"
+    "mtime": 1789431459.7493038,
+    "seen": 1789514972.3441339,
+    "ast_hash": "faa2ea97d01628eae8229b98e7e9d66c",
+    "semantic_hash": ""
   },
   "docs/FLIR Camera Getting Started.html": {
     "mtime": 1786314111.6499026,
@@ -762,10 +762,10 @@
     "semantic_hash": "7b77a27f2a5c235bd84ba811c57976c6"
   },
   "overnight-prompt.md": {
-    "mtime": 1786729933.270235,
-    "seen": 1788565447.9697807,
-    "ast_hash": "cc19d0c291e6133a308f2fa6ba1ab5a8",
-    "semantic_hash": "cc19d0c291e6133a308f2fa6ba1ab5a8"
+    "mtime": 1789431459.7514935,
+    "seen": 1789514972.3441339,
+    "ast_hash": "26a71c8674782d3d1a8651e754a20b4d",
+    "semantic_hash": ""
   },
   "docs/PySpinDoc.pdf": {
     "mtime": 1786314111.6286724,
@@ -798,9 +798,33 @@
     "semantic_hash": "dbc0461514d229ebad73132644b692eb"
   },
   ".claude/settings.json": {
-    "mtime": 1788565668.7818675,
-    "seen": 1789089011.5040627,
-    "ast_hash": "672517a4525564e79779a0e74fa32a7a",
+    "mtime": 1789498708.030322,
+    "seen": 1789514972.3441339,
+    "ast_hash": "ea6ade4123fe0cce311ac5827920d7c5",
+    "semantic_hash": ""
+  },
+  "acquisition/acquisition/camera_registry.py": {
+    "mtime": 1789514383.4367747,
+    "seen": 1789514972.3441339,
+    "ast_hash": "5caea0cd518bf10e517906cc43a81628",
+    "semantic_hash": ""
+  },
+  "acquisition/app/session_service.py": {
+    "mtime": 1789514572.9143589,
+    "seen": 1789514972.3441339,
+    "ast_hash": "82054fe98020edc895f6724433a2a086",
+    "semantic_hash": ""
+  },
+  "acquisition/tests/test_session_service.py": {
+    "mtime": 1789514788.512346,
+    "seen": 1789514972.3441339,
+    "ast_hash": "2bffaf8f00f0a734f456aaea143b891e",
+    "semantic_hash": ""
+  },
+  "acquisition/.claude/skills/encoder-tuning/SKILL.md": {
+    "mtime": 1789509063.849474,
+    "seen": 1789514972.3441339,
+    "ast_hash": "aaf5659f0f9d3c623ebd21912bee619d",
     "semantic_hash": ""
   }
 }

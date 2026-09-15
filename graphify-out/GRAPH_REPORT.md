@@ -1,32 +1,32 @@
-# Graph Report - Acquisition  (2026-09-14)
+# Graph Report - Acquisition  (2026-09-15)
 
 ## Corpus Check
-- 124 files · ~110,890 words
+- 128 files · ~114,751 words
 - Verdict: corpus is large enough that graph structure adds value.
 
 ## Summary
-- 1737 nodes · 3430 edges · 109 communities (92 shown, 16 thin omitted)
-- Extraction: 93% EXTRACTED · 7% INFERRED · 0% AMBIGUOUS · INFERRED: 234 edges (avg confidence: 0.93)
+- 1819 nodes · 3702 edges · 112 communities (94 shown, 17 thin omitted)
+- Extraction: 93% EXTRACTED · 7% INFERRED · 0% AMBIGUOUS · INFERRED: 273 edges (avg confidence: 0.93)
 - Token cost: 0 input · 0 output
 
 ## Graph Freshness
-- Built from commit: `6e217980`
+- Built from commit: `b0a44511`
 - Run `git rev-parse HEAD` and compare to check if the graph is stale.
 - Run `graphify update .` after code changes (no API cost).
 
 ## Community Hubs (Navigation)
 - SchemaValidationError
 - test_stages_b7_scaffold.py
-- load_config
+- app/config.py
 - test_kinematics.py
-- test_spinnaker_camera.py
+- SpinnakerCamera
 - BoundedFrameQueue
-- test_camera_schema.py
-- CameraBackend
-- test_storage_a8.py
-- manifest.py
+- MockCamera
+- session_service.py
+- test_session_setup_screen.py
+- test_manifest.py
 - StereoAcquisition.py
-- test_interfaces.py
+- KeypressStopCondition
 - Provenance
 - NodeMapCallback.py
 - ReviewSessionController
@@ -40,7 +40,7 @@
 - ImageEvents.py
 - Inference.py
 - test_report.py
-- PoseEstimate
+- test_interfaces.py
 - Frame
 - pipeline/config.py
 - orchestration.py
@@ -68,7 +68,7 @@
 - ImageFormatControl.py
 - ImageFormatControl_QuickSpin.py
 - AcquireAndDisplay.py
-- test_recording_screen.py
+- CaptureConfig
 - PySpin.ImagePtr
 - PySpin.System
 - AcquisitionMultipleCamera.py
@@ -85,7 +85,7 @@
 - Enumeration.py
 - Enumeration_QuickSpin.py
 - Injected Image Detection Aeroplane (test photo)
-- Logging.py
+- test_storage_a8.py
 - Encoder Tuning Lever Hierarchy
 - Read-Only Nodes = Spinnaker Parameter Lock
 - PDCT Analysis Pipeline
@@ -114,27 +114,30 @@
 - pdct-acquisition
 - pdct-analysis
 - pdct-shared-schema
-- CameraError
+- SessionService
 - test_storage.py
 - WriterThread
 - test_roundtrip.py
-- SpinnakerCamera
-- test_full_session_round_trip_via_acquisition_naming_and_glue
+- test_session_service.py
+- TrialOutcome
 - TrialRecord
-- NodeCheck
-- CameraInfo
+- ._build_state
+- test_full_session_round_trip_via_acquisition_naming_and_glue
+- AppConfig
+- test_recording_screen.py
+- SKILL.md
 
 ## God Nodes (most connected - your core abstractions)
-1. `Frame` - 42 edges
-2. `MockCamera` - 42 edges
-3. `PixelFormat` - 39 edges
-4. `RecordingSessionController` - 35 edges
-5. `SpinnakerCamera` - 35 edges
-6. `CameraBackend` - 31 edges
-7. `BoundedFrameQueue` - 31 edges
-8. `WriterThread` - 31 edges
-9. `CaptureController` - 28 edges
-10. `load_config()` - 28 edges
+1. `SessionService` - 50 edges
+2. `MockCamera` - 47 edges
+3. `Frame` - 45 edges
+4. `PixelFormat` - 39 edges
+5. `RecordingSessionController` - 39 edges
+6. `CameraBackend` - 37 edges
+7. `SpinnakerCamera` - 37 edges
+8. `CaptureController` - 32 edges
+9. `BoundedFrameQueue` - 31 edges
+10. `WriterThread` - 31 edges
 
 ## Surprising Connections (you probably didn't know these)
 - `Preflight Checks` --semantically_similar_to--> `Stage 1 · qc_gate`  [INFERRED] [semantically similar]
@@ -159,75 +162,75 @@
 - **Spinnaker event handler family** — docs_pyspindoc_eventhandler, docs_pyspindoc_systemeventhandler, docs_pyspindoc_interfaceeventhandler, docs_pyspindoc_deviceeventhandler, docs_pyspindoc_imageeventhandler, docs_pyspindoc_loggingeventhandler [EXTRACTED 1.00]
 - **Spinnaker image acquisition pipeline** — docs_pyspindoc_system, docs_pyspindoc_cameralist, docs_pyspindoc_camera, docs_pyspindoc_imageptr, docs_pyspindoc_spinvideo, docs_spinnaker_python_programmer_guide_grabbing_images [INFERRED 0.85]
 
-## Communities (109 total, 16 thin omitted)
+## Communities (112 total, 17 thin omitted)
 
 ### Community 0 - "SchemaValidationError"
-Cohesion: 0.17
-Nodes (13): ValueError, Exceptions raised by the shared schema readers/writers., On-disk data was written by an incompatible schema version. Per the cross-repo…, A record is missing a required field or holds an invalid value., SchemaValidationError, SchemaVersionError, Shared data contract between the acquisition GUI and the analysis pipeline.…, ``session_metadata.json`` — the session-level record. Written once by the… (+5 more)
+Cohesion: 0.18
+Nodes (12): ValueError, Exceptions raised by the shared schema readers/writers., On-disk data was written by an incompatible schema version. Per the cross-repo…, A record is missing a required field or holds an invalid value., SchemaValidationError, SchemaVersionError, Shared data contract between the acquisition GUI and the analysis pipeline.…, ``session_metadata.json`` — the session-level record. Written once by the… (+4 more)
 
 ### Community 1 - "test_stages_b7_scaffold.py"
 Cohesion: 0.05
-Nodes (76): EvaluationReport, FrameManifestRow, PoseIndexRow, QCRow, Stage-contract dataclasses: one row per record, long/tidy and view-tagged…, Stage 7 (infer, B7 scaffold) output: pose_index.parquet., Stage 1 (qc_gate) output: manifest_qc.parquet = ManifestRow +…, Stage 3 (extract_frames, B7 scaffold) output: frames_manifest.csv. (+68 more)
+Nodes (75): EvaluationReport, FrameManifestRow, PoseIndexRow, Stage-contract dataclasses: one row per record, long/tidy and view-tagged…, Stage 7 (infer, B7 scaffold) output: pose_index.parquet., Stage 3 (extract_frames, B7 scaffold) output: frames_manifest.csv., Stage 5 (train, B7 scaffold) output: training_log.json., Stage 6 (evaluate, B7 scaffold) output: evaluation_report.json. (+67 more)
 
-### Community 2 - "load_config"
-Cohesion: 0.14
-Nodes (20): CameraConfig, ConfigError, load_config(), _node_value_str(), Path, ValueError, Loads and validates config.toml into typed dataclasses. Every threshold, path,…, Renders a TOML scalar the way a GenICam node reports it. Booleans are the only… (+12 more)
+### Community 2 - "app/config.py"
+Cohesion: 0.19
+Nodes (15): ConfigError, load_config(), _node_value_str(), Path, ValueError, Loads and validates config.toml into typed dataclasses. Every threshold, path,…, Renders a TOML scalar the way a GenICam node reports it. Booleans are the only…, Parses and validates config.toml. Raises ConfigError on any missing key.… (+7 more)
 
 ### Community 3 - "test_kinematics.py"
 Cohesion: 0.07
 Nodes (63): KinematicsConfig, CalibrationRecord, Stage 2 (calibration) output data contract. The calibration stage itself --…, apply_likelihood_filter(), compute_pole_frame(), compute_trial_kinematics(), compute_velocity(), detect_descent() (+55 more)
 
-### Community 4 - "test_spinnaker_camera.py"
-Cohesion: 0.10
-Nodes (26): _normalize_enum_name(), Case, spaces and punctuation removed, so "User Set 1" == "UserSet1". GenICam…, Compares a node reading to its expected value, tolerantly. Camera booleans read…, _values_match(), camera(), fixture, parametrize, SpinnakerCamera: structural behaviour with no hardware, plus a hardware-marked… (+18 more)
+### Community 4 - "SpinnakerCamera"
+Cohesion: 0.06
+Nodes (49): CameraError, RuntimeError, A camera failed to open, load its UserSet, or stream., _acquire_system(), _build_handler_class(), _find_enum_entry(), _make_frame_event_handler(), _node_value_str() (+41 more)
 
 ### Community 5 - "BoundedFrameQueue"
-Cohesion: 0.12
-Nodes (18): Wires one CameraBackend's frame callback to the pre-roll buffer, a latest-frame…, Enum, BoundedFrameQueue, Bounded, drop-on-full frame queue between capture and the writer thread.…, The unit of data a CameraBackend produces per exposure., Orchestrates capture, writing, and trial state for one locked session. The rig…, Consumes frames from a bounded queue and pipes them to FFmpeg as raw video.…, _ffprobe_frame_count() (+10 more)
+Cohesion: 0.18
+Nodes (12): BoundedFrameQueue, _ffprobe_frame_count(), Path, requires_ffmpeg, Checkpoint A2: MockCamera -> capture controller -> bounded queue -> writer ->…, Simulates a crash mid-trial by truncating the file FFmpeg wrote. A plain MP4 is…, The pre-roll snapshot and the frames queued after it must be contiguous.…, test_a_recording_cut_off_mid_trial_still_decodes() (+4 more)
 
-### Community 6 - "test_camera_schema.py"
+### Community 6 - "MockCamera"
+Cohesion: 0.06
+Nodes (36): NodeCheck, One camera setting read back and compared against its expected value. Values…, Reads back each named camera node and compares it to ``expected``. Read-only by…, MockCamera, FrameCallback, Every check passes: a synthetic camera has no real nodes to contradict the…, Path, Runs every check and returns all outcomes. Deliberately does not short-circuit… (+28 more)
+
+### Community 7 - "session_service.py"
 Cohesion: 0.07
-Nodes (33): MockCamera, FrameCallback, Path, Runs every check and returns all outcomes. Deliberately does not short-circuit…, run_preflight_checks(), parametrize, The camera backend schema: what a backend reports about itself, and what…, A camera left free-running delivers far more frames than the rate stamped on… (+25 more)
+Nodes (23): CameraBackend, ABC, FrameCallback, Camera abstraction. SpinnakerCamera and MockCamera both implement this. Every…, Begins delivering frames to ``on_frame`` from the backend's own thread. Must…, Stops frame delivery. Idempotent if not currently streaming., The camera's serial number (or a synthetic one for MockCamera)., ``(width, height)`` actually being delivered, read from the camera. Not the… (+15 more)
 
-### Community 7 - "CameraBackend"
-Cohesion: 0.08
-Nodes (15): CameraBackend, ABC, FrameCallback, Camera abstraction. SpinnakerCamera and MockCamera both implement this. Every…, Begins delivering frames to ``on_frame`` from the backend's own thread. Must…, Stops frame delivery. Idempotent if not currently streaming., The camera's serial number (or a synthetic one for MockCamera)., ``(width, height)`` actually being delivered, read from the camera. Not the… (+7 more)
+### Community 8 - "test_session_setup_screen.py"
+Cohesion: 0.11
+Nodes (23): _camera_checks(), PreflightCheck, PreflightResult, Preflight checks: camera detected, UserSet loaded, camera settings verified…, One named check and its outcome. Passing checks are retained, not just…, Why the most recent load_user_set() returned False, if it did. Lets preflight…, MetadataConfig, QWidget (+15 more)
 
-### Community 8 - "test_storage_a8.py"
-Cohesion: 0.05
-Nodes (57): _camera_checks(), PreflightCheck, PreflightResult, Preflight checks: camera detected, UserSet loaded, camera settings verified…, One named check and its outcome. Passing checks are retained, not just…, Why the most recent load_user_set() returned False, if it did. Lets preflight…, MetadataConfig, QWidget (+49 more)
-
-### Community 9 - "manifest.py"
-Cohesion: 0.14
-Nodes (32): ManifestRow, Stage 0 (build_manifest) output: manifest.parquet, one row per trial x view., build_manifest(), compute_manifest_input_hashes(), dataframe_to_manifest_rows(), _find_trial_file(), manifest_rows_to_dataframe(), DataFrame (+24 more)
+### Community 9 - "test_manifest.py"
+Cohesion: 0.16
+Nodes (27): build_manifest(), compute_manifest_input_hashes(), dataframe_to_manifest_rows(), _find_trial_file(), DataFrame, Path, Scans every session directory under archive_root. A directory counts as a…, One hash per session's session_metadata.json/trials.csv -- if any session's… (+19 more)
 
 ### Community 10 - "StereoAcquisition.py"
 Cohesion: 0.09
 Nodes (33): acquire_images(), compute_3d_point_cloud_and_save(), configure_chunk_data(), configure_stereo_params(), disable_chunk_data(), display_chunk_data_from_image(), enable_camera_stream(), enable_node() (+25 more)
 
-### Community 11 - "test_interfaces.py"
-Cohesion: 0.09
-Nodes (24): KeypressStopCondition, ABC, IDLE -> RECORDING -> IDLE trial state machine. Guards: min-duration swallow,…, Pluggable predicate consulted by ``TrialStateMachine.tick()`` to decide whether…, The PDCT default: stops only when externally signalled. The Qt spacebar handler…, TrialStopCondition, Recording screen (screen 2 of 3): preview tiles, large-font readouts, spacebar…, Paradigm (+16 more)
+### Community 11 - "KeypressStopCondition"
+Cohesion: 0.07
+Nodes (21): KeypressStopCondition, ABC, Pluggable predicate consulted by ``TrialStateMachine.tick()`` to decide whether…, The PDCT default: stops only when externally signalled. The Qt spacebar handler…, TrialStopCondition, Recording screen (screen 2 of 3): preview tiles, large-font readouts, spacebar…, Paradigm, ABC (+13 more)
 
 ### Community 12 - "Provenance"
-Cohesion: 0.13
-Nodes (25): current_code_commit(), hash_config(), hash_file(), make_provenance(), Provenance, provenance_path_for(), Any, datetime (+17 more)
+Cohesion: 0.14
+Nodes (23): current_code_commit(), hash_config(), hash_file(), make_provenance(), Provenance, provenance_path_for(), Any, datetime (+15 more)
 
 ### Community 13 - "NodeMapCallback.py"
 Cohesion: 0.09
 Nodes (26): acquire_images(), change_height_and_gain(), configure_callbacks(), configure_event_callbacks(), EventNodeCallback, GainNodeCallback, HeightNodeCallback, main() (+18 more)
 
 ### Community 14 - "ReviewSessionController"
-Cohesion: 0.13
-Nodes (18): QKeyEvent, QWidget, Review screen (screen 3 of 3, skippable): trial table, flag editing, note…, ReviewScreen, Path, Loads a completed session's trials.csv for review: flag editing, note entry,…, ReviewSessionController, _key_event() (+10 more)
+Cohesion: 0.15
+Nodes (17): QKeyEvent, QWidget, Review screen (screen 3 of 3, skippable): trial table, flag editing, note…, ReviewScreen, Loads a completed session's trials.csv for review: flag editing, note entry,…, ReviewSessionController, _key_event(), Checkpoint A7 (skippable, built anyway): trial table, flag editing, note entry,… (+9 more)
 
 ### Community 15 - "RecordingSessionController"
 Cohesion: 0.12
-Nodes (10): CameraRig, datetime, Path, Currently recording trial if active, else most recently completed…, Periodic call (GUI timer): advances max-duration / stop-condition auto-stop and…, Reason-code hotkey handler. Toggles on the target trial and re-persists…, Ctrl+Delete: removes the last completed trial's video, sidecar, and record.…, One camera's live capture pipeline for the session. (+2 more)
+Nodes (7): datetime, Path, Currently recording trial if active, else most recently completed…, Periodic call (GUI timer): advances max-duration / stop-condition auto-stop and…, Reason-code hotkey handler. Toggles on the target trial and re-persists…, Ctrl+Delete: removes the last completed trial's video, sidecar, and record.…, RecordingSessionController
 
 ### Community 16 - "TrialPhase"
-Cohesion: 0.14
-Nodes (20): Enum, What ``request_toggle()`` actually did, so the GUI can react (e.g. show the…, TrialPhase, TrialToggleAction, FakeClock, _machine(), ManualStopCondition, Checkpoint A3: min-duration swallow, max-duration auto-stop, suspicious-short… (+12 more)
+Cohesion: 0.16
+Nodes (22): Enum, IDLE -> RECORDING -> IDLE trial state machine. Guards: min-duration swallow,…, What ``request_toggle()`` actually did, so the GUI can react (e.g. show the…, TrialPhase, TrialToggleAction, TrialTimingConfig, test_trial_state_machine_starts_idle(), FakeClock (+14 more)
 
 ### Community 17 - "InterfaceEventHandler"
 Cohesion: 0.10
@@ -238,8 +241,8 @@ Cohesion: 0.12
 Nodes (26): main(), print_boolean_node(), print_category_node_and_all_features(), print_command_node(), print_enumeration_node_and_current_entry(), print_float_node(), print_integer_node(), print_string_node() (+18 more)
 
 ### Community 19 - "test_qc_gate.py"
-Cohesion: 0.19
-Nodes (24): QCConfig, evaluate_trial(), DataFrame, Path, qc_gate(), qc_rows_to_dataframe(), Stage 1: qc_gate. All rules are config-driven thresholds (invariant 6). Never…, Returns (included, exclusion_reason). Every failing rule is recorded in… (+16 more)
+Cohesion: 0.16
+Nodes (27): ManifestRow, QCRow, Stage 0 (build_manifest) output: manifest.parquet, one row per trial x view., Stage 1 (qc_gate) output: manifest_qc.parquet = ManifestRow +…, manifest_rows_to_dataframe(), frozenset fields become sorted lists -- parquet has no set type, and a…, evaluate_trial(), DataFrame (+19 more)
 
 ### Community 20 - "test_orchestration.py"
 Cohesion: 0.18
@@ -258,20 +261,20 @@ Cohesion: 0.14
 Nodes (25): acquire_images(), camera_close_file(), camera_delete_file(), camera_open_file(), camera_write_to_file(), configure_chunk_data(), configure_inference(), configure_test_pattern() (+17 more)
 
 ### Community 24 - "test_report.py"
-Cohesion: 0.18
-Nodes (24): KinematicsLongRow, Stage 8 (kinematics, B4) output: kinematics_long.parquet -- one row per frame x…, Stage 8 (kinematics, B4) output: trial_summary.parquet -- one row per trial., TrialSummaryRow, aggregate_by_keypoint(), aggregate_overall(), aggregate_velocity_by_height(), _descent_summary_stats() (+16 more)
+Cohesion: 0.17
+Nodes (28): KinematicsLongRow, Stage 8 (kinematics, B4) output: kinematics_long.parquet -- one row per frame x…, Stage 8 (kinematics, B4) output: trial_summary.parquet -- one row per trial., TrialSummaryRow, aggregate_by_keypoint(), aggregate_overall(), aggregate_velocity_by_height(), _descent_summary_stats() (+20 more)
 
-### Community 25 - "PoseEstimate"
+### Community 25 - "test_interfaces.py"
 Cohesion: 0.15
-Nodes (13): NullPoseProvider, The only PoseProvider this app ships. Real inference is out of scope., Always returns None. Satisfies PoseProvider structurally so callers (e.g. a…, PoseEstimate, PoseProvider, PoseProvider protocol: the seam for DLC-Live, not implemented yet. Any real-…, One frame's inferred keypoints. Shape TBD by the DLC-Live integration;…, Returns a pose estimate for this frame, or None if unavailable. (+5 more)
+Nodes (16): NullPoseProvider, The only PoseProvider this app ships. Real inference is out of scope., Always returns None. Satisfies PoseProvider structurally so callers (e.g. a…, PoseEstimate, PoseProvider, PoseProvider protocol: the seam for DLC-Live, not implemented yet. Any real-…, One frame's inferred keypoints. Shape TBD by the DLC-Live integration;…, Returns a pose estimate for this frame, or None if unavailable. (+8 more)
 
 ### Community 26 - "Frame"
-Cohesion: 0.08
-Nodes (13): CaptureController, Attaches ``sink`` and returns the pre-roll to prepend, atomically. The returned…, Begins forwarding frames to ``sink`` with no pre-roll handoff. A trial with a…, What the camera is actually delivering -- the writer sizes its FFmpeg pipe from…, For preview only (invariant 5) -- reads the latest frame rather than consuming…, Frame, Enqueues ``frame``. Never blocks. Returns False and increments the drop counter…, Blocks up to ``timeout`` seconds. Raises queue.Empty on timeout. (+5 more)
+Cohesion: 0.07
+Nodes (16): CaptureController, Attaches ``sink`` and returns the pre-roll to prepend, atomically. The returned…, Begins forwarding frames to ``sink`` with no pre-roll handoff. A trial with a…, What the camera is actually delivering -- the writer sizes its FFmpeg pipe from…, For preview only (invariant 5) -- reads the latest frame rather than consuming…, Frame, Enqueues ``frame``. Never blocks. Returns False and increments the drop counter…, Blocks up to ``timeout`` seconds. Raises queue.Empty on timeout. (+8 more)
 
 ### Community 27 - "pipeline/config.py"
-Cohesion: 0.17
-Nodes (17): CalibrationEpoch, ConfigError, KeypointsConfig, load_config(), PathsConfig, Path, ValueError, Loads and validates config.toml into typed dataclasses. Every threshold, path,… (+9 more)
+Cohesion: 0.16
+Nodes (18): CalibrationEpoch, ConfigError, KeypointsConfig, load_config(), PathsConfig, Path, ValueError, QCConfig (+10 more)
 
 ### Community 28 - "orchestration.py"
 Cohesion: 0.24
@@ -290,8 +293,8 @@ Cohesion: 0.17
 Nodes (18): acquire_images(), configure_sequencer_part_one(), configure_sequencer_part_two(), main(), print_device_info(), print_retrieve_node_failure(), This function sets a single state. It sets the sequence number, applies custom…, Now that the states have all been set, this function readies the camera to use… (+10 more)
 
 ### Community 32 - "verify_a10.py"
-Cohesion: 0.15
-Nodes (12): probe_encoder(), FFmpeg encoder capability probing and fallback selection. h264_qsv (Intel Quick…, Runs a throwaway 1-frame encode. Returns True iff it succeeds., Returns ``preferred`` if it actually works here, else ``fallback``. Never…, resolve_encoder(), test_resolve_encoder_falls_back_when_preferred_is_unavailable(), ffprobe(), main() (+4 more)
+Cohesion: 0.10
+Nodes (17): probe_encoder(), FFmpeg encoder capability probing and fallback selection. h264_qsv (Intel Quick…, Runs a throwaway 1-frame encode. Returns True iff it succeeds., Returns ``preferred`` if it actually works here, else ``fallback``. Never…, resolve_encoder(), test_resolve_encoder_falls_back_when_preferred_is_unavailable(), ffprobe(), main() (+9 more)
 
 ### Community 33 - "CounterAndTimer.py"
 Cohesion: 0.16
@@ -306,8 +309,8 @@ Cohesion: 0.15
 Nodes (17): acquire_images(), configure_trigger(), grab_next_image_by_trigger(), main(), print_device_info(), This function acquires an image by executing the trigger node. :param cam:…, # TODO: Blackfly and Flea3 GEV cameras need 2 second delay after software…, This function acquires and saves 10 images from a device. Please see… (+9 more)
 
 ### Community 36 - "TrialStateMachine"
-Cohesion: 0.19
-Nodes (8): Seconds since the current trial started; 0.0 while IDLE., Spacebar handler entry point. Starts a trial from IDLE, stops one from…, Periodic check (e.g. a Qt timer) for max-duration auto-stop and…, Owns trial phase and timing guards for one paradigm's trials. Not itself a Qt…, TrialStateMachine, TrialToggleResult, TrialTimingConfig, test_trial_state_machine_starts_idle()
+Cohesion: 0.23
+Nodes (6): Seconds since the current trial started; 0.0 while IDLE., Spacebar handler entry point. Starts a trial from IDLE, stops one from…, Periodic check (e.g. a Qt timer) for max-duration auto-stop and…, Owns trial phase and timing guards for one paradigm's trials. Not itself a Qt…, TrialStateMachine, TrialToggleResult
 
 ### Community 37 - "RecordingScreen"
 Cohesion: 0.30
@@ -322,8 +325,8 @@ Cohesion: 0.18
 Nodes (15): acquire_images(), configure_gpio(), main(), print_device_info(), This function sets the trigger mode to on/off. :param nodemap: Transport layer…, This function acquires and saves multiple image sets from a device. :param cam:…, This function prints the device information of the camera from the transport…, This function acts as the body of the example; please see NodeMapInfo example… (+7 more)
 
 ### Community 40 - "PixelFormat"
-Cohesion: 0.13
-Nodes (7): PixelFormat, Pixel formats a CameraBackend may deliver. Deliberately a small closed set, not…, The ``-pixel_format`` value for FFmpeg's rawvideo demuxer., Path, These values were read off the camera, not chosen. See HARDWARE.md., test_config_matches_the_rig_camera(), str
+Cohesion: 0.10
+Nodes (12): Wires one CameraBackend's frame callback to the pre-roll buffer, a latest-frame…, PixelFormat, Enum, Bounded, drop-on-full frame queue between capture and the writer thread.…, The unit of data a CameraBackend produces per exposure., Pixel formats a CameraBackend may deliver. Deliberately a small closed set, not…, The ``-pixel_format`` value for FFmpeg's rawvideo demuxer., Orchestrates capture, writing, and trial state for one locked session. The rig… (+4 more)
 
 ### Community 41 - "test_recording_session.py"
 Cohesion: 0.25
@@ -373,9 +376,9 @@ Nodes (11): acquire_images(), configure_custom_image_settings(), main(), print_d
 Cohesion: 0.24
 Nodes (10): acquire_and_display_images(), handle_close(), main(), This function acts as the body of the example; please see NodeMapInfo example…, # NOTE: keyboard and matplotlib must be installed on Python interpreter prior…, Example entry point; notice the volume of data that the logging event handler…, # NOTE: Unlike the C++ examples, we cannot rely on pointer objects being…, This function will close the GUI when close event happens. :param evt: Event… (+2 more)
 
-### Community 53 - "test_recording_screen.py"
-Cohesion: 0.17
-Nodes (16): CaptureConfig, EncoderConfig, The right quality flag and value for ``codec``. libx264's -crf and QSV's…, StorageConfig, _FakeConfig, _key_event(), _make_screen(), requires_ffmpeg (+8 more)
+### Community 53 - "CaptureConfig"
+Cohesion: 0.29
+Nodes (7): CaptureConfig, EncoderConfig, The right quality flag and value for ``codec``. libx264's -crf and QSV's…, StorageConfig, _FakeConfig, _FakeConfig, Just the sub-configs RecordingSessionController actually reads.
 
 ### Community 54 - "PySpin.ImagePtr"
 Cohesion: 0.22
@@ -441,9 +444,9 @@ Nodes (6): main(), query_interface(), # NOTE: Unlike the C++ examples, we cannot
 Cohesion: 0.48
 Nodes (7): Injected Image Detection Aeroplane (test photo), Expected class label 'aeroplane' (ground truth for the detection demo), Spinnaker image injection (file fed into the camera stream in place of the sensor), On-camera inference / detection example (Firefly DL neural-network classification), Grayscale / Mono8-compatible imagery (no color channels), PySpin / Spinnaker SDK example asset bundle (docs/PySpinExamples), Photographic subject: twin-engine airliner on approach through storm clouds (monochrome)
 
-### Community 70 - "Logging.py"
-Cohesion: 0.29
-Nodes (5): LoggingEventHandler, main(), Although logging events are just as flexible and extensible as other events,…, This function displays readily available logging information. :param…, Example entry point; notice the volume of data that the logging event handler…
+### Community 70 - "test_storage_a8.py"
+Cohesion: 0.12
+Nodes (32): check_disk_status(), DiskStatus, estimate_remaining_minutes(), existing_ancestor(), free_space_gb(), measure_bitrate_mb_per_min(), Path, Free-space indicator and remaining-recording-time estimate. "GB free is not… (+24 more)
 
 ### Community 71 - "Encoder Tuning Lever Hierarchy"
 Cohesion: 0.33
@@ -493,41 +496,49 @@ Nodes (5): Stage 6 · evaluate, Stage 3 · extract_frames, Stage 4 · labeling (
 Cohesion: 0.67
 Nodes (3): Shared PySpin System Singleton, Invariant 1 — N-Camera by Construction, Manual Release of CameraPtr / CameraList / SystemPtr
 
-### Community 100 - "CameraError"
-Cohesion: 0.16
-Nodes (17): CameraError, RuntimeError, A camera failed to open, load its UserSet, or stream., _acquire_system(), _build_handler_class(), _find_enum_entry(), _make_frame_event_handler(), _node_value_str() (+9 more)
+### Community 100 - "SessionService"
+Cohesion: 0.11
+Nodes (13): git_commit(), PreflightFailed, datetime, Path, RuntimeError, The commit this code is running from, for session provenance. Never raises: a…, Newest frame from one camera, for preview (invariant 5). Deliberately outside…, Runs every camera's checks plus the shared FFmpeg/disk ones. Cameras are… (+5 more)
 
 ### Community 101 - "test_storage.py"
-Cohesion: 0.21
-Nodes (19): create_session_directory(), datetime, Path, Session directory and trial filename generation. See acquisition/CLAUDE.md…, Refusing to overwrite an existing session directory (never allowed)., Creates and returns the session directory. Never overwrites., session_dir_name(), session_dir_path() (+11 more)
+Cohesion: 0.19
+Nodes (20): create_session_directory(), datetime, Path, Session directory and trial filename generation. See acquisition/CLAUDE.md…, Refusing to overwrite an existing session directory (never allowed)., Creates and returns the session directory. Never overwrites., session_dir_name(), session_dir_path() (+12 more)
 
 ### Community 102 - "WriterThread"
-Cohesion: 0.14
-Nodes (10): RuntimeError, The FFmpeg invocation for this trial. Separated from :meth:`run` so it is…, Fails loudly on the first frame if its geometry doesn't match what FFmpeg was…, FFmpeg exited non-zero. Carries its stderr tail for diagnostics., Requests a clean shutdown: drain whatever is already queued, then close…, WriterError, WriterThread, The bug this exists for: FFmpeg does not error on a size mismatch, it silently… (+2 more)
+Cohesion: 0.11
+Nodes (13): RuntimeError, The FFmpeg invocation for this trial. Separated from :meth:`run` so it is…, Fails loudly on the first frame if its geometry doesn't match what FFmpeg was…, FFmpeg exited non-zero. Carries its stderr tail for diagnostics., Requests a clean shutdown: drain whatever is already queued, then close…, WriterError, WriterThread, parametrize (+5 more)
 
 ### Community 103 - "test_roundtrip.py"
+Cohesion: 0.22
+Nodes (14): test_full_session_writes_every_artifact_and_they_validate(), Path, One row: everything captured once per session, at lock time., SessionMetadata, Path, write_timestamps_csv(), Round-trip proof of the acquisition <-> analysis contract (checkpoint A0).…, Simulates the contract end-to-end: everything one session directory holds. (+6 more)
+
+### Community 104 - "test_session_service.py"
+Cohesion: 0.17
+Nodes (19): _config(), fixture, parametrize, requires_ffmpeg, Checkpoint A12: the composition root runs a whole session with no UI. These…, The guard the Qt timer used to own. Nothing here calls tick()., The real config.toml, shrunk to test speed. Deliberately built from the shipped…, service() (+11 more)
+
+### Community 105 - "TrialOutcome"
 Cohesion: 0.24
-Nodes (13): Path, One row: everything captured once per session, at lock time., SessionMetadata, Path, write_timestamps_csv(), Round-trip proof of the acquisition <-> analysis contract (checkpoint A0).…, Simulates the contract end-to-end: everything one session directory holds., _synthetic_session_metadata() (+5 more)
-
-### Community 104 - "SpinnakerCamera"
-Cohesion: 0.16
-Nodes (6): Read live, not cached. While ExposureAuto is on, the resulting rate tracks…, _release_system(), SpinnakerCamera, The target format is a construction-time decision from config, unlike…, test_close_is_idempotent_on_a_camera_that_never_opened(), test_pixel_format_is_known_before_the_camera_is_open()
-
-### Community 105 - "test_full_session_round_trip_via_acquisition_naming_and_glue"
-Cohesion: 0.21
-Nodes (10): Non-destructive peek at the most recently completed trial's outcome -- unlike…, Ctrl+Delete handler: discards the last completed trial after confirmation is…, A completed trial's timing and auto-applied flags. Experimenter-assigned flags…, TrialOutcome, build_trial_record(), datetime, Bridges TrialStateMachine's TrialOutcome (monotonic timing, no wall-clock…, A4's proof: build a real session directory using only this app's own… (+2 more)
+Nodes (8): Non-destructive peek at the most recently completed trial's outcome -- unlike…, Ctrl+Delete handler: discards the last completed trial after confirmation is…, A completed trial's timing and auto-applied flags. Experimenter-assigned flags…, TrialOutcome, build_trial_record(), datetime, Bridges TrialStateMachine's TrialOutcome (monotonic timing, no wall-clock…, test_build_trial_record_maps_outcome_to_schema_fields()
 
 ### Community 106 - "TrialRecord"
-Cohesion: 0.24
-Nodes (10): Any, Path, One trial's outcome: identity, timing, flags, and capture stats., Valid by default; only experimenter flags make a trial invalid. auto_flags…, read_trials_csv(), TrialRecord, write_trials_csv(), _synthetic_trials() (+2 more)
+Cohesion: 0.17
+Nodes (12): Path, Any, Path, ``trials.csv`` — one row per trial, the machine-readable valid/invalid table.…, One trial's outcome: identity, timing, flags, and capture stats., Valid by default; only experimenter flags make a trial invalid. auto_flags…, read_trials_csv(), TrialRecord (+4 more)
 
-### Community 107 - "NodeCheck"
-Cohesion: 0.18
-Nodes (6): NodeCheck, One camera setting read back and compared against its expected value. Values…, Reads back each named camera node and compares it to ``expected``. Read-only by…, Synthetic camera backend. The whole app must run against this with zero…, Every check passes: a synthetic camera has no real nodes to contradict the…, test_node_check_describes_a_mismatch_usefully()
+### Community 107 - "._build_state"
+Cohesion: 0.17
+Nodes (7): CameraState, Stops any running trial, then the tick loop and every camera. Idempotent:…, A snapshot for the UI. Never blocks on a slow trial stop. If the controller…, Stopping one camera must not prevent stopping the rest., Everything a UI needs to render, in one immutable snapshot., _safe_stop(), SessionState
 
-### Community 108 - "CameraInfo"
-Cohesion: 0.25
-Nodes (7): build_session_metadata(), datetime, Assembles SessionMetadata at session lock (A5) from config + runtime info., test_build_session_metadata_maps_config_and_runtime_info(), CameraInfo, Any, One camera's identity and onboard-settings verification for a session.
+### Community 108 - "test_full_session_round_trip_via_acquisition_naming_and_glue"
+Cohesion: 0.22
+Nodes (9): build_session_metadata(), datetime, Assembles SessionMetadata at session lock (A5) from config + runtime info., A4's proof: build a real session directory using only this app's own…, test_build_session_metadata_maps_config_and_runtime_info(), test_full_session_round_trip_via_acquisition_naming_and_glue(), CameraInfo, Any (+1 more)
+
+### Community 109 - "AppConfig"
+Cohesion: 0.33
+Nodes (8): AppConfig, main(), parse_args(), Path, CLI entry point. python -m app --mock --headless # full session, synthetic…, run_headless(), _with_session_root(), Namespace
+
+### Community 110 - "test_recording_screen.py"
+Cohesion: 0.40
+Nodes (9): _key_event(), _make_screen(), requires_ffmpeg, Checkpoint A6 GUI shell: spacebar control, reason-code hotkeys, visual flag…, test_ctrl_delete_discards_last_trial(), test_dropped_frames_readout_updates_via_timer_tick(), test_preview_tile_created_per_camera_rig(), test_reason_code_hotkey_toggles_flag_and_chip_style() (+1 more)
 
 ## Ambiguous Edges - Review These
 - `Qt 5.7 (LGPL v3)` → `C# Graphical User Interface API`  [AMBIGUOUS]
@@ -540,9 +551,9 @@ Nodes (7): build_session_metadata(), datetime, Assembles SessionMetadata at sess
   docs/FLIR Camera Getting Started.html · relation: conceptually_related_to
 
 ## Knowledge Gaps
-- **63 isolated node(s):** `pdct-acquisition`, `pdct-analysis`, `ChunkDataTypes`, `TriggerType`, `TriggerType` (+58 more)
-  These have ≤1 connection - possible missing edges or undocumented components. (Counts symbols only; 640 node(s) total have ≤1 connection when file, concept and rationale nodes are included.)
-- **16 thin communities (<3 nodes) omitted from report** — run `graphify query` to explore isolated nodes.
+- **64 isolated node(s):** `pdct-acquisition`, `pdct-analysis`, `ChunkDataTypes`, `TriggerType`, `TriggerType` (+59 more)
+  These have ≤1 connection - possible missing edges or undocumented components. (Counts symbols only; 663 node(s) total have ≤1 connection when file, concept and rationale nodes are included.)
+- **17 thin communities (<3 nodes) omitted from report** — run `graphify query` to explore isolated nodes.
 
 ## Suggested Questions
 _Questions this graph is uniquely positioned to answer:_
@@ -555,9 +566,9 @@ _Questions this graph is uniquely positioned to answer:_
   _Edge tagged AMBIGUOUS (relation: rationale_for) - confidence is low._
 - **What is the exact relationship between `FLIR Camera Getting Started (empty file)` and `PySpin vs C++ API Differences`?**
   _Edge tagged AMBIGUOUS (relation: conceptually_related_to) - confidence is low._
-- **Why does `MockCamera` connect `test_camera_schema.py` to `BoundedFrameQueue`, `CameraBackend`, `PixelFormat`, `test_recording_session.py`, `test_storage_a8.py`, `NodeCheck`, `test_recording_screen.py`, `Frame`?**
-  _High betweenness centrality (0.029) - this node is a cross-community bridge._
-- **Why does `load_config()` connect `load_config` to `verify_a10.py`, `TrialStateMachine`, `test_spinnaker_camera.py`, `test_camera_schema.py`, `test_storage_a8.py`, `PixelFormat`, `RecordingSessionController`, `test_recording_screen.py`?**
-  _High betweenness centrality (0.025) - this node is a cross-community bridge._
-- **Why does `CameraBackend` connect `CameraBackend` to `CameraError`, `BoundedFrameQueue`, `test_camera_schema.py`, `test_spinnaker_camera.py`, `PixelFormat`, `test_storage_a8.py`, `SpinnakerCamera`, `NodeCheck`, `test_interfaces.py`, `Frame`?**
-  _High betweenness centrality (0.022) - this node is a cross-community bridge._
+- **Why does `SessionService` connect `SessionService` to `TrialStateMachine`, `session_service.py`, `test_session_setup_screen.py`, `test_session_service.py`, `TrialRecord`, `._build_state`, `KeypressStopCondition`, `AppConfig`, `test_full_session_round_trip_via_acquisition_naming_and_glue`, `RecordingSessionController`, `TrialPhase`, `Frame`?**
+  _High betweenness centrality (0.028) - this node is a cross-community bridge._
+- **Why does `Frame` connect `Frame` to `SpinnakerCamera`, `BoundedFrameQueue`, `MockCamera`, `session_service.py`, `PixelFormat`, `WriterThread`, `SessionService`, `KeypressStopCondition`, `RecordingScreen`, `test_interfaces.py`?**
+  _High betweenness centrality (0.024) - this node is a cross-community bridge._
+- **Why does `CameraBackend` connect `session_service.py` to `SpinnakerCamera`, `SessionService`, `MockCamera`, `PixelFormat`, `test_session_setup_screen.py`, `test_interfaces.py`, `Frame`?**
+  _High betweenness centrality (0.024) - this node is a cross-community bridge._

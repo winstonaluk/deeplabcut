@@ -127,6 +127,14 @@ Do not violate these. If a request seems to require breaking one, stop and ask.
    settings all live in TOML.
 10. **Long-run stability.** Multi-minute trials mean the writer sustains
     continuous throughput with no unbounded memory growth.
+11. **The tick loop is server-side.** `RecordingSessionController.tick()`
+    enforces `max_trial_duration_s` and polls the stop predicate (invariant 8).
+    `SessionService` owns a daemon thread that drives it, so the
+    runaway-recording guard does not depend on a UI being open -- the retired
+    Qt screen drove it from a `QTimer`, which meant the guard stopped working
+    whenever the UI did. Never move ticking back into a UI. The corollary is
+    that `RecordingSessionController` is now reached from several threads, so
+    every mutation goes through `SessionService`'s lock; it has none of its own.
 
 ## Out of scope — do not build
 
@@ -268,40 +276,11 @@ the binding constraint, and the transfer workflow still matters.
 
 ## Encoder tuning
 
-Goal: smallest files that still support accurate DLC keypoints. The levers, in
-descending order of how much they actually matter:
-
-1. **Exposure time — not a codec setting at all.** Auto-exposure is on, so the
-   value floats: it read 15 ms on one probe and 1 ms on another with nothing
-   changed but ambient light. A rat descending a pole moves visibly within
-   15 ms, and that motion blur destroys keypoint precision in a way no encoder
-   setting recovers and no bitrate compensates for. **Fix the exposure, make it
-   short (single-digit ms), and pay for it with light and gain rather than with
-   CRF.** Blur also makes frames *harder* to compress, so this is the rare
-   change that improves quality and size together. SpinView, saved to
-   `UserSet1`.
-2. **Resolution.** 720 × 540 is already the full sensor; there is nothing to
-   give back here without cropping to an ROI. If the animal occupies a
-   predictable part of the frame, an ROI in `UserSet1` is the single largest
-   size saving available — and it raises the achievable frame rate too.
-3. **Quality (`crf` / `qsv_global_quality`).** The obvious knob and the one to
-   tune last, from measurement.
-4. **Preset.** Slower presets are strictly better bytes-per-quality, paid in
-   CPU. Free quality if the writer keeps up.
-5. **Codec choice.** `h264_qsv` is fixed-function: fast, near-zero CPU, and
-   less efficient per bit than `libx264` at a slow preset. At 720 × 540 / 30 fps
-   the software encoder may well keep up on the i7-7700 and produce smaller
-   files — worth measuring before assuming Quick Sync is the right default.
-   Whichever wins, the writer must sustain throughput with no dropped frames.
-
-**Measure, don't guess:** `python tools/measure_encoder.py REFERENCE.mp4` sweeps
-codec × quality × preset over one real trial and reports size and SSIM. Use real
-footage with an animal moving; a static clip flatters every setting equally.
-SSIM is a proxy — confirm the winner by labelling a few frames from it, since
-keypoint accuracy is the actual criterion and no full-frame metric measures it.
-
-30 fps is ample for PDCT descent kinematics. Raising it costs size linearly and
-buys nothing for this paradigm; it is a config value if a future one needs it.
+See the `encoder-tuning` skill (`.claude/skills/encoder-tuning/SKILL.md`)
+before changing codec, quality, preset, resolution, fps, or exposure. Short
+version: exposure time dominates anything a codec setting can do, and
+`python tools/measure_encoder.py REFERENCE.mp4` is how the trade-off gets
+measured instead of guessed.
 
 ## Preflight checks
 
@@ -321,27 +300,21 @@ animal in hand should see everything that needs fixing in one pass.
 
 ## Project structure
 
-```
-gui/           PySide6 screens and widgets
-acquisition/   CameraBackend, capture threads, ring buffer, writer
-               HARDWARE.md      what the camera measurably is
-               SPINNAKER_PLAN.md  A10 implementation plan
-paradigms/     Paradigm ABC + PDCTParadigm
-storage/       Naming, metadata, sidecars, disk mgmt, staging
-pose/          PoseProvider protocol, NullPoseProvider, TriggerService stub
-tools/         Hardware probes. Need PySpin; outside the package and the suite.
-tests/
-config.toml
-```
+`ls` shows the layout. What it does not show:
+
+- `acquisition/HARDWARE.md` — what the camera measurably is, not what we
+  intend it to be. When it and a design note disagree, it wins.
+- `acquisition/SPINNAKER_PLAN.md` — A10 implementation plan.
+- `tools/` — hardware probes. Need PySpin; outside the package and the suite.
 
 ## Commands
 
 ```bash
-# run against synthetic frames, no hardware
-python -m app --mock
+# record a full session against synthetic frames, no hardware
+python -m app --mock --headless
 
-# run against real camera
-python -m app
+# same, against the real camera
+python -m app --headless
 
 # tests (must pass with no hardware attached; hardware tests deselected)
 pytest
@@ -408,4 +381,5 @@ When running headless (`claude -p`) I cannot answer questions. Therefore:
 | A9 | `SpinnakerCamera` scaffold | **Done.** Class scaffolded against `CameraBackend`, plan written. Superseded by the A9.5 schema pass below, which rewrote the plan against real hardware. |
 | A9.5 | Camera backend schema | **Done.** Backend reports `resolution`, `pixel_format`, `frame_rate`, `verify_settings`, `incomplete_frame_count`; preflight asserts config against all of them; writer derives geometry and pixel format from the backend; `[camera_verify]` table in config; `HARDWARE.md` records the measured camera. |
 | A10 | `SpinnakerCamera` implementation | **Done, verified 2026-09-10.** `python tools/verify_a10.py` passes every check against the configured `UserSet1` (680 × 460 ROI, 30 fps latched): 1801 frames in 60 s, zero drops, incomplete frames or frame-ID gaps, monotonic hardware timestamps, `h264_qsv` fragmented MP4. `pytest -m hardware` 6/6. Also verified end to end through `RecordingSessionController` with preflight and pre-roll. |
-| A11 | Application wiring | **Not started.** Nothing outside tests constructs a camera, `CaptureController`, `CameraRig`, or any screen; `app/__main__.py` raises `NotImplementedError` and `resolve_encoder()` is never called by the app. Every part is built and tested, but `python -m app` does not run. This composition root is what stands between the repo and lab use. |
+| A11 | Jetson environment spike | **Not started.** Needs the board. PySpin (aarch64/cp310) + numpy<2 + Jetson PyTorch + TensorRT + dlclive coexisting in one env; a clean 60 s stream with `usbfs_memory_mb` raised; libx264 throughput under inference load. Records measured results in `JETSON.md`. |
+| A12 | Composition root | **Done 2026-09-15.** `app/session_service.py` constructs cameras from `[[cameras]]` via `acquisition/camera_registry.py`, runs preflight, starts capture, writes `session_metadata.json`, and owns the trial lifecycle. `python -m app --mock --headless` records a full session. 13 tests in `tests/test_session_service.py`. |
