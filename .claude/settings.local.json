@@ -2,7 +2,8 @@
   "permissions": {
     "allow": [
       "PowerShell(conda env list)",
-      "PowerShell(python --version)"
+      "PowerShell(python --version)",
+      "PowerShell(graphify query \"composition root: how app/__main__.py, load_config, preflight, CaptureController, CameraRig and RecordingSessionController would be wired together\" --budget 1200 2>&1)"
     ]
   }
 }
