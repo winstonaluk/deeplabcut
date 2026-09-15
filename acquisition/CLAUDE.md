@@ -7,14 +7,15 @@ session — treat everything here as standing rules unless I say otherwise in ch
 
 ## What this is
 
-A multi-camera behavioral video acquisition application for a rodent
+A single-camera behavioral video acquisition application for a rodent
 neuroscience lab. Replaces vendor capture tooling (SpinView) which requires
 manual start/stop and post-hoc association of video files with animal metadata.
 This app binds metadata at write time and reduces per-trial interaction to a
 single keypress.
 
 Current paradigm: **PDCT**. The architecture must accommodate future paradigms
-(maze task) and additional cameras without a rewrite.
+(maze task) without a rewrite. The rig has **one camera and will not grow** --
+see invariant 1.
 
 ## Glossary
 
@@ -25,7 +26,6 @@ Current paradigm: **PDCT**. The architecture must accommodate future paradigms
 | **Session** | All trials for one animal on one day. |
 | **DeepLabCut / DLC** | Markerless pose-estimation framework. Consumes our video offline. |
 | **DLC-Live** | Real-time DLC inference. Not implemented yet; interface stubbed only. |
-| **Anipose** | Multi-camera 3D triangulation built on DLC. Future downstream consumer. |
 | **Spinnaker / PySpin** | Teledyne FLIR camera SDK and its Python bindings. |
 | **UserSet** | Camera-onboard settings profile. We use `UserSet1`, configured in SpinView. |
 | **Chunk data** | Per-frame metadata (hardware timestamp, frame ID) embedded by the camera. |
@@ -59,8 +59,9 @@ Graphics 630 · 500 GB total · Windows.
 - 500 GB is a real constraint. Disk management is a feature, not an afterthought.
 
 **Camera:** one Teledyne FLIR **Blackfly S BFS-U3-04S2C**, serial `22514545`,
-USB3, global shutter, via Spinnaker/PySpin 4.3.0.190. Two more views (lateral,
-top-down) come later.
+USB3, global shutter, via Spinnaker/PySpin 4.3.0.190. Mounted **above the
+apparatus looking down** (`top_down`). It is the rig's only camera and no
+further views are planned.
 
 - Sensor is **720 × 540** (Sony IMX287, 0.4 MP) — *not* 1280 × 720. The old
   "720p60" note was a misread of "720 × 540"; every figure derived from it was
@@ -87,12 +88,15 @@ subprocess (`h264_qsv`, fallback `libx264`).
 
 Do not violate these. If a request seems to require breaking one, stop and ask.
 
-1. **N-camera by construction.** Cameras come from a config list, currently one
-   entry. No single-camera assumptions anywhere.
+1. **One camera.** The rig has a single top-down camera and will not gain more.
+   It still reaches code through the `[[cameras]]` config list and a list of
+   rigs, because that shape costs nothing and the `view` column is part of the
+   shared schema -- but do not build features for a second camera, and never
+   treat the list as a reason to defer a decision.
 2. **Mock backend is first-class.** `CameraBackend` is abstract with
    `SpinnakerCamera` and `MockCamera` implementations. The whole app must run and
    all tests must pass with zero hardware attached.
-3. **Capture never blocks.** One capture thread per camera using Spinnaker's
+3. **Capture never blocks.** One capture thread using Spinnaker's
    image event handler (not polling) → bounded queue → separate writer thread
    piping to FFmpeg. On queue-full: drop frame, increment counter, log. Never block.
 4. **Recording integrity is independent of everything else.** The GUI thread and
@@ -201,9 +205,9 @@ confirmation, decrementing the counter. Every hotkey also has a large on-screen 
 
 ## Pre-roll buffer
 
-Rolling in-RAM buffer of the most recent **2 s** (config) per camera, running
+Rolling in-RAM buffer of the most recent **2 s** (config), running
 whenever streaming — not just during trials. Prepended on trial start so descent
-onset is never clipped by reaction time. **~19 MB** per camera per 2 s at
+onset is never clipped by reaction time. **~19 MB** per 2 s at
 680 × 460 Mono8 / 30 fps.
 
 ## Files and naming
@@ -220,9 +224,9 @@ onset is never clipped by reaction time. **~19 MB** per camera per 2 s at
 - `<HHMM>` = trial start time. `t<NNN>` = zero-padded trial number, which alone
   guarantees uniqueness; HHMM is informational and disambiguates repeat sessions
   on the same animal same day.
-- Optional `<view>` token, config-toggleable, **default off**. Enable when more
-  cameras are added — DLC flattens folder structure on import, so filenames must
-  stand alone.
+- Optional `<view>` token, config-toggleable, **default off** and expected to
+  stay off with one camera. The switch stays because DLC flattens folder
+  structure on import, so filenames must stand alone.
 - Never overwrite an existing session directory.
 - `trials.csv` exports the trial table so downstream analysis filters the
   training-frame pool on flags without parsing JSON. Valid/invalid must be

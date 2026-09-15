@@ -15,6 +15,7 @@ or SpinView reconfiguration, and update this file with what it prints.
 | | |
 |---|---|
 | Model | Blackfly S **BFS-U3-04S2C** (Sony IMX287, 0.4 MP) |
+| Mounting | Above the apparatus, looking down (`top_down`) -- the rig's only camera |
 | Serial | `22514545` |
 | Interface | **USB3Vision**, SuperSpeed |
 | Device version | `1707.1.6.0` |
@@ -45,7 +46,7 @@ notes appears to have been a misreading of "720 × 540". Consequences that
 followed from the old number, now corrected:
 
 - Raw rate at 30 fps Mono8 is **11.7 MB/s**, not the ~25 MB/s implied by 720p.
-- The 2 s pre-roll is **~23 MB per camera**, not the ~55 MB documented.
+- The 2 s pre-roll is **~23 MB**, not the ~55 MB documented.
 - Encoded storage per trial is correspondingly smaller than the ~37 MB/min
   estimate, which was computed for 1280 × 720.
 

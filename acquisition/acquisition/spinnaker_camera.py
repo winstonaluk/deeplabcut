@@ -64,9 +64,8 @@ _LOCKED_PARAMS_HINT = (
 # --------------------------------------------------------------------------
 # Shared System instance
 # --------------------------------------------------------------------------
-# PySpin.System.GetInstance() is process-wide, not per-camera. The app is
-# N-camera by construction (invariant 1), so instances share one System with a
-# reference count, released only when the last camera closes. Releasing while
+# PySpin.System.GetInstance() is process-wide, not per-camera. Instances share
+# one System with a reference count, released only when the last camera closes. Releasing while
 # another camera is still open is a classic PySpin crash.
 
 _system: Any = None

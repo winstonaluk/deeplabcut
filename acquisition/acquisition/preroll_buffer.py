@@ -1,4 +1,4 @@
-"""Rolling in-RAM buffer of the most recent N seconds, per camera.
+"""Rolling in-RAM buffer of the most recent N seconds.
 
 Runs whenever streaming, not just during trials, so descent onset is never
 clipped by the experimenter's reaction time to the spacebar. Backed by a

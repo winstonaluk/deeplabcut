@@ -27,10 +27,9 @@ cannot be obtained any other way. Design every stage to serve `y(t)` accuracy.
 | **VCA** | Visual Cliff Assay. Second paradigm, same pipeline. |
 | **Trial** | One descent. 1–5 minutes for our rats. One video file. |
 | **Session** | All trials for one animal on one day. |
-| **View** | Camera position: `lateral_L`, `lateral_R`, `top_down`. Currently one camera. |
+| **View** | Camera position. The rig has exactly one: `top_down`. The column stays in every schema so tables remain view-tagged. |
 | **DLC** | DeepLabCut 3.0, **PyTorch engine** (not TensorFlow). |
 | **SuperAnimal** | DLC's pretrained zero-shot models used as training init. |
-| **Anipose** | Multi-camera 3D triangulation on DLC output. Future stage. |
 | **CRSP** | Institutional network storage. **Storage only — no compute.** |
 | **Pole landmarks** | Static keypoints on the apparatus, labelled alongside the animal. |
 | **Trial UID** | Stable unique key for a trial+view. Primary join key everywhere. |
@@ -46,9 +45,20 @@ cannot be obtained any other way. Design every stage to serve `y(t)` accuracy.
   pole top. Anything that distorts apparent velocity as a function of height is a
   first-order threat, not a cosmetic issue — this is why lens distortion
   correction is mandatory rather than optional.
-- Rats **spiral around the pole** during descent. With a single lateral camera the
-  animal is occluded behind the pole for a meaningful fraction of every trial.
-  Single-camera kinematics are **provisional** until 3D triangulation exists.
+- Rats **spiral around the pole** during descent. The single `top_down` camera
+  observes that spiral directly: angular position and radial distance from the
+  pole centre are well measured, and the animal is never occluded behind the
+  pole.
+- **The camera looks down the pole axis, so height is not directly observable.**
+  This contradicts the velocity-by-height profile named above as a dependent
+  variable, and every height-based metric in stage 8 (`height_fraction`,
+  `detect_descent`, `compute_pole_frame`, `perpendicular_offset_mm`) was built
+  for a lateral view. Apparent size shrinks as the animal descends away from the
+  lens, which is a weak, nonlinear proxy for height, not a substitute for it.
+  **Trial duration is unaffected** and remains directly measurable. Resolve this
+  before trusting any stage 8 output: either remount the camera to see the pole
+  from the side, or redefine the dependent variable in terms of what a top-down
+  view actually measures.
 - A rat occupies a substantial fraction of the pole's length. Snout, centroid, and
   tail base are separated along the height axis, so keypoint choice changes the
   shape of the velocity profile — it is not a constant offset.
@@ -106,8 +116,9 @@ Do not violate these. If a request seems to require breaking one, stop and ask.
    regenerate for any labelled keypoint without re-labelling or re-training.
 9. **Nothing downstream of inference requires CRSP or a GPU.** Kinematics, stats,
    and figures run on small derived files, offline, anywhere.
-10. **All pose tables are view-tagged and long-format**, so 3D triangulation is an
-    inserted stage rather than a rewrite. No 2D-only assumptions in schemas.
+10. **All pose tables are view-tagged and long-format.** One camera means one
+    view value, but the tag stays: it is part of the cross-repo schema contract
+    and keeps every table self-describing.
 11. **Use the DLC Python API, never the DLC GUI**, except for manual labelling.
 12. **Analysis frame rate is decoupled from acquisition frame rate.** Any temporal
     downsampling is an explicit, logged config choice.
@@ -144,7 +155,6 @@ Each stage: pure function of (inputs, config) → artifacts + provenance sidecar
   epoch is a QC failure, not a silent pass.
 - Intrinsics only. **Pixel→mm scale is derived per-video from pole landmarks at
   the kinematics stage**, not here.
-- Extrinsics for 3D triangulation come later.
 
 ### 3 · `extract_frames`
 - **In:** `manifest_qc.parquet` (included rows only)
@@ -170,9 +180,10 @@ Each stage: pure function of (inputs, config) → artifacts + provenance sidecar
   reduced subset behaves unexpectedly. Use the full set or a custom scheme.
 
 ### 5 · `train`
-- SuperAnimal initialisation. **Subjects are rats:** SuperAnimal-Quadruped is the
-  expected init for lateral views. SuperAnimal-TopViewMouse is mouse-trained —
-  decide top-down init by zero-shot comparison, not assumption.
+- SuperAnimal initialisation. **Subjects are rats and the view is top-down.**
+  SuperAnimal-TopViewMouse matches the geometry but is mouse-trained;
+  SuperAnimal-Quadruped matches the species but is trained on side views.
+  Decide between them by zero-shot comparison on real frames, not by assumption.
 - **Out:** snapshot + `training_log.json` (config, seed, train/test split, snapshot ID)
 
 ### 6 · `evaluate`
@@ -211,13 +222,9 @@ Each stage: pure function of (inputs, config) → artifacts + provenance sidecar
   and `kinematics_long.parquet`.
 - No GPU, no network storage, no video.
 
-### Future · `triangulate`
-- Anipose 3D from multi-view 2D pose. Inserts between stages 7 and 8. Design
-  schemas so this is an insert, not a rewrite. **Do not build yet.**
-
 ## Config keys
 
-Camera/view list · archive root · local cache root · derived root · DLC project
+Camera/view (one entry: `top_down`) · archive root · local cache root · derived root · DLC project
 path · keypoint scheme (incl. pole landmarks) · `primary_keypoint` · SuperAnimal
 init per view · QC thresholds (dropped-frame rate, duration range, fps deviation)
 · pole length mm · likelihood cutoff · `max_gap_frames` · smoothing method and
@@ -226,7 +233,8 @@ window · descent rule name + parameters · evaluation error gate · analysis fp
 
 ## Out of scope — do not build
 
-- Anipose / 3D triangulation (define schema seam only)
+- Anipose / 3D triangulation -- the rig has one camera, so there is no second
+  view to triangulate from
 - Any camera or acquisition code (that's the companion repo)
 - A GUI. This pipeline is CLI + config. Labelling uses DLC's or napari's existing UI.
 - Real-time or DLC-Live inference

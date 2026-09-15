@@ -27,7 +27,7 @@
 - **Wires one CameraBackend's frame callback to the pre-roll buffer, a latest-frame…** (1 connections) — `acquisition/acquisition/capture_controller.py`
 - **Bounded, drop-on-full frame queue between capture and the writer thread.…** (1 connections) — `acquisition/acquisition/frame_queue.py`
 - **The unit of data a CameraBackend produces per exposure.** (1 connections) — `acquisition/acquisition/frame.py`
-- **Orchestrates capture, writing, and trial state for one locked session, across N…** (1 connections) — `acquisition/acquisition/recording_session.py`
+- **Orchestrates capture, writing, and trial state for one locked session. The rig…** (1 connections) — `acquisition/acquisition/recording_session.py`
 - **Consumes frames from a bounded queue and pipes them to FFmpeg as raw video.…** (1 connections) — `acquisition/acquisition/writer.py`
 - *... and 3 more nodes in this community*
 

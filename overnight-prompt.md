@@ -1,5 +1,11 @@
 # Overnight build — PDCT acquisition + analysis
 
+> **Superseded in part (2026-09-14).** Kept as a record of what was asked for.
+> The rig is **single-camera** -- one `top_down` view, mounted above the
+> apparatus looking down -- so the multi-camera, Anipose and 3D-triangulation
+> plans below are dropped. Current rules live in `acquisition/CLAUDE.md` and
+> `analysis/CLAUDE.md`.
+
 Save as `.claude/overnight-prompt.md` at the monorepo root.
 
 Invoke with:

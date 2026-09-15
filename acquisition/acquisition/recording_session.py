@@ -1,5 +1,7 @@
-"""Orchestrates capture, writing, and trial state for one locked session,
-across N cameras (invariant 1).
+"""Orchestrates capture, writing, and trial state for one locked session.
+
+The rig has one camera (invariant 1); rigs stay a list because the shape costs
+nothing and the view tag is part of the shared schema.
 
 Deliberately plain Python with no Qt dependency, so the whole recording
 lifecycle -- start/stop, pre-roll prepending, per-trial file writing, flag

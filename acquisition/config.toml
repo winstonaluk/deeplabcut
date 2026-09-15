@@ -7,11 +7,11 @@ version = "0.1.0"
 rig_id = "rig-1"
 
 [[cameras]]
-# N-camera by construction (invariant 1). One entry today; add more [[cameras]]
-# tables to add views. `name` is a human label (e.g. "lateral"), not the
-# Spinnaker serial.
+# One camera (invariant 1) -- the rig has a single top-down view and will not
+# grow. The list shape stays because the `view` column is part of the shared
+# schema. `name` is a human label, not the Spinnaker serial.
 serial = "22514545"  # Blackfly S BFS-U3-04S2C; see acquisition/HARDWARE.md
-name = "lateral"
+name = "top_down"
 # The symbolic name ("UserSet1") or the name SpinView displays ("User Set 1").
 user_set = "UserSet1"
 
@@ -128,9 +128,9 @@ animal_id_regex = "^[A-Za-z0-9_-]+$"
 [storage]
 session_root = "./sessions"
 min_free_gb = 20
-# Optional <view> filename token; default off. Enable when more cameras are
-# added -- DLC flattens folder structure on import so filenames must stand
-# alone (see acquisition/CLAUDE.md "Files and naming").
+# Optional <view> filename token; default off, and expected to stay off with
+# one camera. The switch stays because DLC flattens folder structure on import,
+# so filenames must stand alone (see acquisition/CLAUDE.md "Files and naming").
 filename_include_view_token = false
 
 [staging]

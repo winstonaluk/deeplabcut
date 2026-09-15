@@ -1,5 +1,11 @@
 # Claude Code Prompt — Behavioral Acquisition GUI (v3)
 
+> **Superseded in part (2026-09-14).** Kept as a record of what was asked for.
+> The rig is **single-camera** -- one `top_down` view, mounted above the
+> apparatus looking down -- so the multi-camera, Anipose and 3D-triangulation
+> plans below are dropped. Current rules live in `acquisition/CLAUDE.md` and
+> `analysis/CLAUDE.md`.
+
 > Paste everything below the line into Claude Code as your opening message.
 > Recommended: run `claude` in an empty project directory first.
 

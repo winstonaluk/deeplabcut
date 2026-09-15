@@ -1,7 +1,7 @@
-# Graph Report - Acquisition  (2026-09-10)
+# Graph Report - Acquisition  (2026-09-14)
 
 ## Corpus Check
-- 124 files · ~110,256 words
+- 124 files · ~110,890 words
 - Verdict: corpus is large enough that graph structure adds value.
 
 ## Summary
@@ -10,7 +10,7 @@
 - Token cost: 0 input · 0 output
 
 ## Graph Freshness
-- Built from commit: `c13da319`
+- Built from commit: `6e217980`
 - Run `git rev-parse HEAD` and compare to check if the graph is stale.
 - Run `graphify update .` after code changes (no API cost).
 
@@ -183,7 +183,7 @@ Nodes (26): _normalize_enum_name(), Case, spaces and punctuation removed, so "Us
 
 ### Community 5 - "BoundedFrameQueue"
 Cohesion: 0.12
-Nodes (18): Wires one CameraBackend's frame callback to the pre-roll buffer, a latest-frame…, Enum, BoundedFrameQueue, Bounded, drop-on-full frame queue between capture and the writer thread.…, The unit of data a CameraBackend produces per exposure., Orchestrates capture, writing, and trial state for one locked session, across N…, Consumes frames from a bounded queue and pipes them to FFmpeg as raw video.…, _ffprobe_frame_count() (+10 more)
+Nodes (18): Wires one CameraBackend's frame callback to the pre-roll buffer, a latest-frame…, Enum, BoundedFrameQueue, Bounded, drop-on-full frame queue between capture and the writer thread.…, The unit of data a CameraBackend produces per exposure., Orchestrates capture, writing, and trial state for one locked session. The rig…, Consumes frames from a bounded queue and pipes them to FFmpeg as raw video.…, _ffprobe_frame_count() (+10 more)
 
 ### Community 6 - "test_camera_schema.py"
 Cohesion: 0.07

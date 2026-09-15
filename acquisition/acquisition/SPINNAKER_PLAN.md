@@ -55,9 +55,9 @@ pattern from `ImageFormatControl.py` instead.
 
 ## System / CameraList lifetime (cross-cutting)
 
-`PySpin.System.GetInstance()` is process-wide, not per-camera. Because the app
-is N-camera by construction (invariant 1), `SpinnakerCamera` instances must
-**share one `System`** rather than each calling `GetInstance()` — a module-level
+`PySpin.System.GetInstance()` is process-wide, not per-camera, so
+`SpinnakerCamera` instances **share one `System`** rather than each calling
+`GetInstance()` — a module-level
 lazily created singleton with reference counting, released via
 `system.ReleaseInstance()` only when the last camera closes. Releasing while
 another camera is still open is a classic PySpin crash.
