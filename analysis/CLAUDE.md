@@ -3,8 +3,19 @@
 Project context for the scriptable DeepLabCut analysis pipeline. Auto-loaded each
 session — treat everything here as standing rules unless I say otherwise in chat.
 
-Companion repo: the acquisition GUI (separate project, has its own CLAUDE.md).
-This repo has **no PySpin dependency** and never touches camera hardware.
+Companion repo: the acquisition backend + web UI (separate project, has its own
+CLAUDE.md). This repo has **no PySpin dependency** and never touches camera
+hardware.
+
+**Moving to its own repository (`pdct-analysis`).** The two apps run on different
+machines and cannot share a Python interpreter: acquisition is pinned to **3.10
+exactly** by its `cp310` PySpin wheel, while `pipeline/config.py` does an
+unguarded `import tomllib`, which is stdlib only from **3.11**. So
+`pyproject.toml` declaring `requires-python = ">=3.10"` is false and must become
+`>=3.11`; target **3.12**. Acquisition's `numpy<2` bound (PySpin cannot load 2.x)
+also silently caps this repo at numpy 1.x whenever the two share an environment,
+which nothing here records. After the split, `shared/` stays in the acquisition
+repo and is consumed as a tagged dependency — see "Cross-repo contract".
 
 ---
 
@@ -27,7 +38,7 @@ cannot be obtained any other way. Design every stage to serve `y(t)` accuracy.
 | **VCA** | Visual Cliff Assay. Second paradigm, same pipeline. |
 | **Trial** | One descent. 1–5 minutes for our rats. One video file. |
 | **Session** | All trials for one animal on one day. |
-| **View** | Camera position. The rig has exactly one: `top_down`. The column stays in every schema so tables remain view-tagged. |
+| **View** | Camera position, e.g. `top_down`. The rig is becoming multi-camera; every table stays view-tagged and `trial_uid` includes the view. |
 | **DLC** | DeepLabCut 3.0, **PyTorch engine** (not TensorFlow). |
 | **SuperAnimal** | DLC's pretrained zero-shot models used as training init. |
 | **CRSP** | Institutional network storage. **Storage only — no compute.** |
@@ -37,18 +48,18 @@ cannot be obtained any other way. Design every stage to serve `y(t)` accuracy.
 ## Domain context
 
 - Subjects are **rats**. Trials run **1–5 minutes**.
-- **Acquisition is 30 fps** (camera capable of 60; fps is an acquisition config
-  value). 33 ms temporal resolution — ample for minute-scale descents, marginal
-  for limb-level kinematics. Do not assume 60 fps anywhere.
+- **Acquisition is 30 fps** (fps is an acquisition config value; the sensor can
+  run far faster but exposure time is the binding constraint). 33 ms temporal
+  resolution — ample for minute-scale descents, marginal for limb-level
+  kinematics. Do not assume any other rate anywhere.
 - **Descent duration and the velocity-by-height profile are the dependent
   variables.** The scientific hypothesis is that slowing concentrates near the
   pole top. Anything that distorts apparent velocity as a function of height is a
   first-order threat, not a cosmetic issue — this is why lens distortion
   correction is mandatory rather than optional.
-- Rats **spiral around the pole** during descent. The single `top_down` camera
-  observes that spiral directly: angular position and radial distance from the
-  pole centre are well measured, and the animal is never occluded behind the
-  pole.
+- Rats **spiral around the pole** during descent. The `top_down` camera observes
+  that spiral directly: angular position and radial distance from the pole centre
+  are well measured, and the animal is never occluded behind the pole.
 - **The camera looks down the pole axis, so height is not directly observable.**
   This contradicts the velocity-by-height profile named above as a dependent
   variable, and every height-based metric in stage 8 (`height_fraction`,
@@ -56,9 +67,15 @@ cannot be obtained any other way. Design every stage to serve `y(t)` accuracy.
   for a lateral view. Apparent size shrinks as the animal descends away from the
   lens, which is a weak, nonlinear proxy for height, not a substitute for it.
   **Trial duration is unaffected** and remains directly measurable. Resolve this
-  before trusting any stage 8 output: either remount the camera to see the pole
-  from the side, or redefine the dependent variable in terms of what a top-down
-  view actually measures.
+  before trusting any stage 8 output. Three options, and the third is now the
+  expected one:
+    1. Remount the camera to see the pole from the side — loses the spiral.
+    2. Redefine the dependent variable in terms of what a top-down view measures.
+    3. **Add a lateral camera.** The acquisition rig is going multi-camera, so
+       height becomes directly observable while the top-down view keeps measuring
+       the spiral. This is the planned resolution; stage 8 stays as written and
+       runs on the lateral view. Until that camera exists, stage 8 output is
+       provisional.
 - A rat occupies a substantial fraction of the pole's length. Snout, centroid, and
   tail base are separated along the height axis, so keypoint choice changes the
   shape of the velocity profile — it is not a constant offset.
@@ -116,9 +133,9 @@ Do not violate these. If a request seems to require breaking one, stop and ask.
    regenerate for any labelled keypoint without re-labelling or re-training.
 9. **Nothing downstream of inference requires CRSP or a GPU.** Kinematics, stats,
    and figures run on small derived files, offline, anywhere.
-10. **All pose tables are view-tagged and long-format.** One camera means one
-    view value, but the tag stays: it is part of the cross-repo schema contract
-    and keeps every table self-describing.
+10. **All pose tables are view-tagged and long-format.** With multiple cameras
+    the tag is load-bearing rather than vestigial: `trial_uid` includes the view,
+    and it is what keeps per-view rows distinct. Never drop or default it.
 11. **Use the DLC Python API, never the DLC GUI**, except for manual labelling.
 12. **Analysis frame rate is decoupled from acquisition frame rate.** Any temporal
     downsampling is an explicit, logged config choice.
@@ -224,7 +241,7 @@ Each stage: pure function of (inputs, config) → artifacts + provenance sidecar
 
 ## Config keys
 
-Camera/view (one entry: `top_down`) · archive root · local cache root · derived root · DLC project
+Camera/view list (one entry per camera) · archive root · local cache root · derived root · DLC project
 path · keypoint scheme (incl. pole landmarks) · `primary_keypoint` · SuperAnimal
 init per view · QC thresholds (dropped-frame rate, duration range, fps deviation)
 · pole length mm · likelihood cutoff · `max_gap_frames` · smoothing method and
@@ -233,11 +250,16 @@ window · descent rule name + parameters · evaluation error gate · analysis fp
 
 ## Out of scope — do not build
 
-- Anipose / 3D triangulation -- the rig has one camera, so there is no second
-  view to triangulate from
+- Anipose / 3D triangulation. *(The old reason — "the rig has one camera" — is
+  revoked; the rig is going multi-camera. Triangulation stays out of scope for
+  now as a scope decision, not a physical impossibility, and needs calibrated
+  overlapping views before it is worth revisiting.)*
 - Any camera or acquisition code (that's the companion repo)
 - A GUI. This pipeline is CLI + config. Labelling uses DLC's or napari's existing UI.
-- Real-time or DLC-Live inference
+- Real-time or DLC-Live inference. **DLC-Live runs in the acquisition repo, on
+  the Jetson.** This pipeline is offline-only. Acquisition now writes a per-trial
+  live-pose sidecar; how stage 0 manifests it and whether stage 1 QCs live
+  against offline pose is an open decision, not yet specified.
 - Re-encoding, trimming, or otherwise mutating archived video
 
 ## Commands
@@ -277,8 +299,26 @@ repo. These are a **contract, not an incidental format**.
 
 - Schemas live in `shared/schema/` and are imported here, never redefined locally.
 - Validate `schema_version` on read and fail loudly on mismatch — never coerce.
-- Never change a field name, type, or meaning without updating `shared/schema/`
-  and the acquisition writer in the same commit.
+
+Once this repo is split out, `shared/` lives in the acquisition repo and is
+consumed as a pinned, tagged dependency:
+
+```toml
+dependencies = [
+  "pdct-shared-schema @ git+https://github.com/winstonaluk/pdct-acquisition@schema-v1.0.0#subdirectory=shared",
+]
+```
+
+The old "update both in the same commit" rule cannot survive two git histories.
+It is replaced by:
+
+1. Acquisition changes `shared/schema/`, bumps `schema_version`, updates its
+   writers, and tags `schema-vN.0.0`.
+2. This repo updates the pin and stage 0's reader in one commit.
+3. Neither side merges until both sides' tests pass.
+
+Schema v2 (multi-camera: per-camera metadata, `trial_cameras.csv`, `animal_id`
+and `project_name` on `trials.csv`) is the first real test of this protocol.
 
 ## Unattended runs
 

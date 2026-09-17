@@ -5,9 +5,15 @@ camera; this document is the record of *why* each step is shaped the way it is,
 and the reference for anyone changing it. Verified 2026-08-14: 60 s, 3960
 frames, zero drops, zero incomplete, no frame-ID gaps (`tools/verify_a10.py`).
 
-What remains for A10 to pass end to end is rig configuration, not code —
-`UserSet1` still holds factory defaults, so the `[camera_verify]` and frame-rate
-checks fail. See `HARDWARE.md`.
+A10 passed end to end on **2026-09-10** once `UserSet1` was configured (680 × 460
+ROI, 30 fps latched): 1801 frames in 60 s, zero drops, incomplete frames or
+frame-ID gaps. See `HARDWARE.md`. *(This paragraph previously said `UserSet1`
+still held factory defaults and the verify checks failed — stale since
+2026-09-10.)*
+
+**All of the above was measured on the retired Windows x86-64 host.** The design
+below is host-independent and ports to the Jetson (aarch64) unchanged; only the
+prerequisites section changes. Re-verification on the board is checkpoint A20.
 
 Rewritten 2026-08-14 against the rig's actual camera rather than against
 generic SDK examples — every node name here was confirmed present on the
@@ -17,18 +23,31 @@ notes.
 
 ## Prerequisites
 
-1. Spinnaker SDK installed (vendor installer, not pip). **Already done** on the
-   acquisition PC: 4.3.0.190.
-2. The matching PySpin wheel. **Already installed** in the `acquire` conda env:
-   `spinnaker_python-4.3.0.190-cp310`. Note PySpin wheels are built per Python
-   version and are not forward/backward compatible — this one pins the app to
-   Python 3.10, which is why `app/config.py` falls back to the `tomli` backport
-   instead of stdlib `tomllib`.
-3. numpy **< 2**. PySpin does not support numpy 2.x; `requirements.txt` carries
-   the upper bound.
-4. Camera connected. It is USB3, not GigE — none of the GigE MTU/jumbo-frame/
+1. Spinnaker SDK installed (vendor installer, not pip). The target is now a
+   **Jetson Orin Nano, Linux aarch64** — install the **ARM64/Ubuntu** Spinnaker
+   package, which is a **separate vendor download** from the x86-64 one, with its
+   own version and Python matrix. The retired Windows host ran 4.3.0.190; do not
+   assume the ARM64 build matches.
+2. The matching PySpin wheel. Wheels are built per Python version and are not
+   forward/backward compatible. The retired host used
+   `spinnaker_python-4.3.0.190-cp310`, which is why the app is pinned to Python
+   3.10 and `app/config.py` falls back to the `tomli` backport instead of stdlib
+   `tomllib`. JetPack 6 ships Ubuntu 22.04 / Python 3.10, so the pin plausibly
+   survives — but **verify that a cp310 aarch64 wheel actually exists in the ARM64
+   SDK.** This is the single highest-risk item in checkpoint A11.
+3. numpy **>= 1.20, < 2**. The ceiling is because PySpin does not support numpy
+   2.x. The floor is ARM-specific: the vendor readme (`docs/PySpinReadMe.md`
+   §4.3) records that numpy 1.19.5 on Linux ARM64 makes `import PySpin` raise
+   "Illegal instruction", fixed in 1.20.
+4. **Raise the USB filesystem buffer.** On Linux,
+   `/sys/module/usbcore/parameters/usbfs_memory_mb` defaults to 16 MB, which is
+   far too small for USB3 machine vision and shows up as incomplete frames rather
+   than as a clean error. Make it persistent, and assert it in preflight.
+5. Camera connected. It is USB3, not GigE — none of the GigE MTU/jumbo-frame/
    packet-size tuning advice applies, and there is ample link headroom
-   (380 MB/s limit against the ~11.7 MB/s we need).
+   (380 MB/s limit against the ~11.7 MB/s per camera we need). With several
+   cameras, check the Orin's host-controller topology rather than assuming the
+   per-link headroom composes.
 
 **If every node reads RO**, another Spinnaker session (SpinView, or a script
 that exited without `DeInit()`) has the camera's parameters latched. Close it
@@ -65,6 +84,11 @@ another camera is still open is a classic PySpin crash.
 PySpin also requires `CameraPtr` and `CameraList` to be explicitly `del`'d
 before `ReleaseInstance()`; they are not cleaned up by scope exit the way the
 C++ objects are.
+
+**This refcounting is already correct for N cameras** and is what makes the
+multi-camera rig work without change: each `SpinnakerCamera` increments on open
+and decrements on close, and the `System` outlives all of them until the last one
+closes. Do not "simplify" it back to a per-camera `GetInstance()`.
 
 ```python
 _system = None
@@ -189,7 +213,11 @@ Three details, each of which fails quietly if missed:
   recycles at `Release()`. Frames outlive this callback — the pre-roll deque
   holds ~60 and the writer queue up to 120 — so a view would alias data the
   camera has already overwritten. The corruption scales with queue depth and
-  looks like a compression artifact. This is the highest-risk line in the file.
+  looks like a compression artifact. This is the highest-risk line in the file,
+  and it gets **more** dangerous with a second consumer: the DLC-Live pose worker
+  also reads frames via the latest-frame slot, so a view here would corrupt
+  inference input as well as recorded video, and the two would disagree in ways
+  that look like a model problem. Never make this a view.
 - **Release on every path**, including exceptions, or the camera's buffer pool
   is exhausted and acquisition stalls.
 - **Count incomplete frames separately** from the writer queue's dropped

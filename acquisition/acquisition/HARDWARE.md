@@ -1,30 +1,50 @@
 # The rig camera, as measured
 
-Everything in this file was read off the camera on **2026-08-14** with the
-probe scripts in `acquisition/tools/`. It exists because these readings cannot
-be reproduced anywhere except the acquisition PC with the camera attached, and
-several of them contradict what `acquisition/CLAUDE.md` and `config.toml` said
-before this pass. **When this file and a design document disagree, this file
-wins** — it is the measurement, not the intention.
+Everything in this file was read off the camera with the probe scripts in
+`acquisition/tools/`. It exists because these readings cannot be reproduced
+without the camera attached, and several of them contradict what
+`acquisition/CLAUDE.md` and `config.toml` said before this pass. **When this
+file and a design document disagree, this file wins** — it is the measurement,
+not the intention.
+
+> **Host provenance (2026-09-17).** Every measurement here was taken on the
+> **retired Windows i7-7700 host**, and the rig is moving to a Jetson Orin Nano
+> (aarch64). Camera-side values — sensor geometry, pixel formats, chunk data,
+> node states, `UserSet1` contents — are host-independent and remain valid. Two
+> classes of figure do **not** carry over and are marked inline: anything about
+> the **host Python/SDK build**, and anything about **`h264_qsv`**, which is
+> Intel Quick Sync and does not exist on the Orin Nano (it has no hardware
+> encoder at all). Host-side numbers must be re-measured on the board and
+> recorded in `JETSON.md`.
 
 Re-run `python tools/probe_camera.py` after any firmware change, camera swap,
-or SpinView reconfiguration, and update this file with what it prints.
+SpinView reconfiguration, or host change, and update this file with what it
+prints.
 
 ## Identity
 
 | | |
 |---|---|
 | Model | Blackfly S **BFS-U3-04S2C** (Sony IMX287, 0.4 MP) |
-| Mounting | Above the apparatus, looking down (`top_down`) -- the rig's only camera |
+| Mounting | Above the apparatus, looking down (`top_down`) -- the rig's first camera; a lateral view is planned |
 | Serial | `22514545` |
 | Interface | **USB3Vision**, SuperSpeed |
 | Device version | `1707.1.6.0` |
-| SDK / bindings | Spinnaker **4.3.0.190**, `spinnaker_python` cp310 wheel |
-| Host Python | 3.10.0 (conda env `acquire`), numpy 1.26.4 |
+| SDK / bindings | Spinnaker **4.3.0.190**, `spinnaker_python` cp310 wheel *(Windows x86-64 — retired host)* |
+| Host Python | 3.10.0 (conda env `acquire`), numpy 1.26.4 *(retired host)* |
 
-The trailing `C` in the model number is **colour**. The `cp310` wheel is why
-the acquisition PC is pinned to Python 3.10 — PySpin wheels are built per
-Python version, and the SDK we have ships no 3.11 build.
+The trailing `C` in the model number is **colour**.
+
+The `cp310` wheel is why the host is pinned to Python 3.10 — PySpin wheels are
+built per Python version, and the SDK we had shipped no 3.11 build. **Both host
+rows above are stale.** The Jetson needs the **ARM64/aarch64** Spinnaker SDK,
+which is a separate vendor download with its own version and Python matrix; the
+`cp310` assumption has not been verified there. Two ARM-specific constraints to
+carry across: raise `/sys/module/usbcore/parameters/usbfs_memory_mb` (the 16 MB
+default is far too small for USB3 machine vision), and keep **numpy >= 1.20** —
+the vendor readme (`docs/PySpinReadMe.md` §4.3) records that 1.19.5 on Linux
+ARM64 makes `import PySpin` raise "Illegal instruction". The `numpy < 2` ceiling
+still applies.
 
 ## Sensor and format
 
@@ -244,10 +264,10 @@ defaults. `DeviceReset` has not been run.
 | Frames written | **1801** in 60.0 s vs 1800 expected |
 | Rate from hardware timestamps | **30.00 fps** |
 | Dropped / incomplete / frame-ID gaps | **0 / 0 / 0** |
-| Encoder | `h264_qsv` at `-global_quality 22`, fragmented MP4 |
-| Output | **55.5 MB/min** |
+| Encoder | `h264_qsv` at `-global_quality 22`, fragmented MP4 *(Quick Sync — not available on the Jetson)* |
+| Output | **55.5 MB/min** *(QSV; not a forecast for `libx264` on ARM)* |
 
-Also run through `RecordingSessionController` -- the layer the GUI drives --
+Also run through `RecordingSessionController` -- the layer the UI drives --
 after preflight, for two trials (35 s and 8 s, one flagged mid-trial). The 2 s
 pre-roll was prepended with frame IDs contiguous across the boundary;
 hardware-clock rate 29.996 fps with inter-frame s.d. under 1 µs (max 33.34 ms);
@@ -267,8 +287,8 @@ FFmpeg — via `python tools/verify_a10.py --seconds 60`:
 | Incomplete frames | **0** |
 | Frame-ID gaps | **0** |
 | Hardware timestamps | strictly increasing throughout |
-| Encoder | `h264_qsv` at `-global_quality 22`, exited 0 |
-| Output | 5.6 MB — **5.6 MB/min at 66 fps** |
+| Encoder | `h264_qsv` at `-global_quality 22`, exited 0 *(Quick Sync — not available on the Jetson)* |
+| Output | 5.6 MB — **5.6 MB/min at 66 fps** *(QSV; re-measure for `libx264`)* |
 
 The pipeline sustained **more than double** the configured 30 fps with zero
 loss, which is the real evidence for invariants 3 and 10. Encoded size is far
@@ -276,14 +296,32 @@ below the ~37 MB/min that the old 1280×720 estimate implied; at 30 fps expect
 roughly half of the 5.6 MB/min above, so a 5-minute trial lands in the low tens
 of megabytes.
 
-FFmpeg 8.1.1 is installed and **`h264_qsv` genuinely encodes on the HD 630** —
-confirmed with a real one-frame probe, not just its presence in `-encoders`.
-`hevc_qsv` and `libx264` work too.
+~~FFmpeg 8.1.1 is installed and `h264_qsv` genuinely encodes on the HD 630~~ —
+**dead as of the Jetson move.** Quick Sync was an Intel HD 630 feature. The Orin
+Nano has no hardware video encoder of any kind (NVIDIA omitted the NVENC
+silicon), so `libx264` on 6 Cortex-A78AE cores is the only path.
+`resolve_encoder()` probes and falls back, which means a stale `h264_qsv` config
+resolves silently rather than failing loudly.
 
 ## Still unmeasured
 
-Rate and jitter at a latched 30 fps are now measured (above). Still open:
+Rate and jitter at a latched 30 fps are measured (above), on the retired host.
+Still open:
 
 - Whether frame IDs stay contiguous over a full 5-minute trial (60 s is clean).
 - Encoder quality/size trade-off on real footage — `tools/measure_encoder.py`,
   which has still never been run against an actual trial.
+
+**Everything host-side has to be re-measured on the Jetson** (checkpoint A11,
+recorded in `JETSON.md`):
+
+- `libx264` throughput and the highest preset that sustains 30 fps per camera —
+  **measured under simultaneous DLC-Live inference load**, since encode and
+  inference share all 6 cores. An idle-board number is meaningless.
+- The same for N cameras: each is an independent encoder process.
+- Whether the aarch64 PySpin wheel exists for cp310 and streams cleanly for 60 s
+  with `usbfs_memory_mb` raised.
+- USB3 host-controller topology and whether multiple cameras share bandwidth.
+- Thermal and clock behaviour under sustained encode + inference (`nvpmodel`
+  MAXN Super, `jetson_clocks`).
+- DLC-Live inference latency, and the end-to-end closed-loop budget.

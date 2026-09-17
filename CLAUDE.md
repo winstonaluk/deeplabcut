@@ -6,7 +6,7 @@ package that is the contract between them.
 ```
 ./
 ├── shared/schema/    contract: session_metadata.json, trials.csv, timestamp sidecars
-├── acquisition/      behavioral video acquisition GUI — see acquisition/CLAUDE.md
+├── acquisition/      acquisition backend (FastAPI) + web UI — see acquisition/CLAUDE.md
 └── analysis/         DeepLabCut analysis pipeline — see analysis/CLAUDE.md
 ```
 
@@ -15,8 +15,28 @@ subdirectory — each carries its own domain context, architecture invariants,
 and checkpoint list. Keep app-specific code inside its own subdirectory; the
 only code shared between the two is `shared/schema/`.
 
-`QUESTIONS.md` at repo root collects ambiguities logged during unattended runs.
-`OVERNIGHT_REPORT.md` at repo root is the run summary for the current build.
+`QUESTIONS.md` at repo root collects ambiguities logged during unattended runs,
+and is the live record of deferred decisions — not a historical log.
+
+## Planned: `analysis/` moves to its own repository
+
+The two apps run on different machines with incompatible dependency stacks, so
+`analysis/` is being split out into `pdct-analysis`. This repo keeps
+`acquisition/` and `shared/`, and is being renamed `pdct-acquisition`.
+
+- **Python floors differ and cannot be reconciled.** Acquisition is pinned to
+  **3.10 exactly** by its `cp310` PySpin wheel. Analysis does an unguarded
+  `import tomllib` (`analysis/pipeline/config.py`), which is stdlib only from
+  **3.11** — so the two cannot share an interpreter, and
+  `analysis/pyproject.toml` claiming `requires-python = ">=3.10"` is false.
+- **numpy conflicts silently.** Acquisition pins `numpy<2` because PySpin cannot
+  load 2.x. Analysis declares no ceiling. In one environment, acquisition's
+  bound caps analysis at 1.x and nothing in `analysis/` records that.
+
+Until the split lands, treat them as two environments in one tree. `shared/`
+stays here afterwards, consumed by analysis as a tagged dependency — see the
+cross-repo contract section in each app's CLAUDE.md for the version protocol
+that replaces the current same-commit rule.
 
 ## graphify
 

@@ -426,10 +426,10 @@
     "semantic_hash": "91a0a8e58828efb3253eb616c2e9dd44"
   },
   "analysis/tests/test_kinematics.py": {
-    "mtime": 1786729933.2642953,
-    "seen": 1788565447.9697807,
-    "ast_hash": "cab705df99f3f243bddc30540559ea3f",
-    "semantic_hash": "cab705df99f3f243bddc30540559ea3f"
+    "mtime": 1789675311.4971197,
+    "seen": 1789675372.7730227,
+    "ast_hash": "61c8b35c4df03ae24f2b104b147bf986",
+    "semantic_hash": ""
   },
   "analysis/tests/test_manifest.py": {
     "mtime": 1786729933.2653162,
@@ -678,39 +678,33 @@
     "semantic_hash": "caeabac7bbef823e344d24f55840c273"
   },
   "CLAUDE.md": {
-    "mtime": 1789430958.3963616,
-    "seen": 1789431434.2218747,
-    "ast_hash": "b415a5245690391670924ba572dd4859",
-    "semantic_hash": ""
-  },
-  "OVERNIGHT_REPORT.md": {
-    "mtime": 1789431459.7503436,
-    "seen": 1789514972.3441339,
-    "ast_hash": "3f922b1bdaad7f7a9ab74b0f644787f2",
+    "mtime": 1789666154.1125698,
+    "seen": 1789675372.7730227,
+    "ast_hash": "31633b2b1224d47090bc826ca6a4bfcd",
     "semantic_hash": ""
   },
   "QUESTIONS.md": {
-    "mtime": 1786735856.6410108,
-    "seen": 1788565447.9697807,
-    "ast_hash": "56a5df1fdc9e76760c8df5f015ac2d65",
-    "semantic_hash": "56a5df1fdc9e76760c8df5f015ac2d65"
+    "mtime": 1789675311.4981265,
+    "seen": 1789675372.7730227,
+    "ast_hash": "4161903c99c63610f7de1bacb06521d2",
+    "semantic_hash": ""
   },
   "acquisition/CLAUDE.md": {
-    "mtime": 1789514945.2468996,
-    "seen": 1789514972.3441339,
-    "ast_hash": "d2a7521f13bf712528f3ec1aded3803b",
+    "mtime": 1789666466.6166253,
+    "seen": 1789675372.7730227,
+    "ast_hash": "1cf1de67f70bfe6a87e6a030db7deb7c",
     "semantic_hash": ""
   },
   "acquisition/acquisition/HARDWARE.md": {
-    "mtime": 1789431184.2708044,
-    "seen": 1789431434.2218747,
-    "ast_hash": "aed0a277ff03975512036aaf695ac80c",
+    "mtime": 1789666546.7806766,
+    "seen": 1789675372.7730227,
+    "ast_hash": "2164794866268f208f0692fd080d5693",
     "semantic_hash": ""
   },
   "acquisition/acquisition/SPINNAKER_PLAN.md": {
-    "mtime": 1789431235.6524112,
-    "seen": 1789431434.2218747,
-    "ast_hash": "ef8470ccbbe18a3baecf4b119751536a",
+    "mtime": 1789666577.108183,
+    "seen": 1789675372.7730227,
+    "ast_hash": "f44886f7ddca7fc828086375581ae040",
     "semantic_hash": ""
   },
   "acquisition/requirements.txt": {
@@ -720,9 +714,9 @@
     "semantic_hash": "8ebf4469d7676ec5e3057aceb2929462"
   },
   "analysis/CLAUDE.md": {
-    "mtime": 1789431195.8589213,
-    "seen": 1789431434.2218747,
-    "ast_hash": "2e330e3b73a08d6cc9c79310141a40f5",
+    "mtime": 1789666509.9302013,
+    "seen": 1789675372.7730227,
+    "ast_hash": "c632f3820f28b507caedb436e0327295",
     "semantic_hash": ""
   },
   "analysis/requirements.txt": {
@@ -730,12 +724,6 @@
     "seen": 1788565447.9697807,
     "ast_hash": "a555ae58d8d1b058127e4da7f7abbfe3",
     "semantic_hash": "a555ae58d8d1b058127e4da7f7abbfe3"
-  },
-  "claude_code_prompt_behavior_acquisition_gui.md": {
-    "mtime": 1789431459.7493038,
-    "seen": 1789514972.3441339,
-    "ast_hash": "faa2ea97d01628eae8229b98e7e9d66c",
-    "semantic_hash": ""
   },
   "docs/FLIR Camera Getting Started.html": {
     "mtime": 1786314111.6499026,
@@ -760,12 +748,6 @@
     "seen": 1788565447.9697807,
     "ast_hash": "7b77a27f2a5c235bd84ba811c57976c6",
     "semantic_hash": "7b77a27f2a5c235bd84ba811c57976c6"
-  },
-  "overnight-prompt.md": {
-    "mtime": 1789431459.7514935,
-    "seen": 1789514972.3441339,
-    "ast_hash": "26a71c8674782d3d1a8651e754a20b4d",
-    "semantic_hash": ""
   },
   "docs/PySpinDoc.pdf": {
     "mtime": 1786314111.6286724,
@@ -822,9 +804,21 @@
     "semantic_hash": ""
   },
   "acquisition/.claude/skills/encoder-tuning/SKILL.md": {
-    "mtime": 1789509063.849474,
-    "seen": 1789514972.3441339,
-    "ast_hash": "aaf5659f0f9d3c623ebd21912bee619d",
+    "mtime": 1789666179.684801,
+    "seen": 1789675372.7730227,
+    "ast_hash": "9cf64fee33aabf0403a3e15c1796ff11",
+    "semantic_hash": ""
+  },
+  "README.md": {
+    "mtime": 1789675277.882553,
+    "seen": 1789675372.7730227,
+    "ast_hash": "9ddef69af62e83aa1a70326daee635fa",
+    "semantic_hash": ""
+  },
+  "acquisition/acquisition/JETSON.md": {
+    "mtime": 1789675230.0257256,
+    "seen": 1789675372.7730227,
+    "ast_hash": "b810f83552552b73440a16bb64d4b428",
     "semantic_hash": ""
   }
 }

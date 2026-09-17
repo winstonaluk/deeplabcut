@@ -1,12 +1,28 @@
 # Questions logged during unattended build
 
 One entry per ambiguity: file, the decision faced, options considered, which
-was chosen, and why. Implemented as the most conservative interpretation per
-`overnight-prompt.md`.
+was chosen, and why. Each was implemented as the most conservative
+interpretation available at the time.
+
+**This is a live record of deferred decisions, not a historical log.** Entries
+are annotated, never rewritten — the reasoning is the point, including where the
+reasoning has since been invalidated. Where an entry has become actionable it
+carries a `> **STATUS**` note saying so and where the live version now lives.
+
+The 2026-09 architecture change (Jetson Orin Nano, FastAPI + React, N cameras,
+DLC-Live) invalidated the *premises* of several entries below while leaving their
+*conclusions* intact. Read the status notes before acting on any entry.
 
 ---
 
 ## A3 · trial-state-machine-min-duration-vs-predicate
+
+> **STATUS 2026-09-17 — now actionable, promoted.** This entry closes by saying
+> a future pose-driven paradigm author should revisit it "when that predicate is
+> actually wired to something". That moment is checkpoint A17: DLC-Live gives a
+> real `PoseStopCondition`. The question is live and is now tracked under "Open
+> decisions" in `acquisition/CLAUDE.md`. The `# TODO(QUESTIONS.md)` marker at
+> `trial_state_machine.py:160` still points here for the reasoning.
 
 **File:** `acquisition/acquisition/trial_state_machine.py`, `tick()`
 
@@ -35,6 +51,13 @@ schema or file-format impact.
 ---
 
 ## A3 · trial-state-machine-predicate-stop-auto-flag
+
+> **STATUS 2026-09-17 — now actionable, promoted, and wider than first thought.**
+> Deferred because no predicate existed beyond the inert `KeypressStopCondition`;
+> A17 creates one. Note the scope has grown: a new `auto_flags` value is read by
+> the analysis pipeline's stage-1 QC gate, so choosing it is a **schema-contract
+> change** subject to the cross-repo version protocol, not a local decision.
+> Tracked under "Open decisions" in `acquisition/CLAUDE.md`.
 
 **File:** `acquisition/acquisition/trial_state_machine.py`, `tick()`
 
@@ -174,6 +197,14 @@ radius well past what was asked.
 fields on `CameraInfo` plus a version bump, not a reshape of anything existing.
 Worth doing deliberately, as its own change, alongside the analysis repo.
 
+> **STATUS 2026-09-17 — scheduled.** This is now checkpoint A16 (schema v2),
+> where N cameras force a coordinated bump anyway: `CameraInfo` gains `view`,
+> `sync_role`, `resolution`, `pixel_format`, `achieved_frame_rate` and the
+> per-node verify results. The "deliberately, as its own change" condition is
+> met. Note the same-commit rule this entry relied on no longer holds — the
+> analysis pipeline is splitting into its own repo, so the tag-and-pin protocol
+> in `acquisition/CLAUDE.md` replaces it.
+
 ---
 
 ## A9.5 · encoder-quality-scales-were-shared — RESOLVED
@@ -213,7 +244,11 @@ Someone has to choose what we actually record.
 **Chosen:** (1) Mono8, and the schema carries both so the choice is one config
 value. DLC gains nothing from colour for this task, Mono8 is a third of the
 bytes on a disk-constrained machine, and debayering costs host CPU on a PC with
-no usable GPU. Recorded honestly in `HARDWARE.md`: because the sensor is
+no usable GPU. *(Premise partly dead as of 2026-09: the Jetson Orin Nano does
+have CUDA and could debayer on the GPU. The conclusion is unchanged and now has
+an additional reason — Mono8 is a third of the bytes to software-encode on a
+board with no hardware encoder, and a third of the bytes to move through
+inference. Mono8 stays.)* Recorded honestly in `HARDWARE.md`: because the sensor is
 colour, Mono8 here is luma derived from the Bayer mosaic, so it is slightly
 softer than a true mono sensor at the same pixel count.
 
@@ -246,7 +281,7 @@ one gap.
    as an explicit input/argument rather than computing them.
 
 **Chosen:** (2). Building an unassigned stage is scope expansion the
-overnight-prompt.md instructions explicitly warn against ("do not expand
+unattended-run instructions explicitly warn against ("do not expand
 scope... however small it seems"), and checkerboard calibration inherently
 needs real calibration images -- there's no synthetic-data path for it the
 way B4's kinematics core has one, so it wouldn't be unattended-buildable

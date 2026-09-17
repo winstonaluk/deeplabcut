@@ -1,6 +1,6 @@
 """Checkpoint B4: stage 8 kinematics core, proven against synthetic pose
 arrays with known ground truth -- the constant-velocity descent test is
-one of the three places (per overnight-prompt.md) tests earn their keep."""
+one of the three places tests earn their keep."""
 
 from __future__ import annotations
 
@@ -63,7 +63,7 @@ def test_interpolate_gaps_short_gap_is_filled():
 
 def test_interpolate_gaps_long_gap_stays_nan():
     """A gap longer than max_gap_frames must stay NaN -- never silently
-    bridged (overnight-prompt.md explicit requirement)."""
+    bridged -- an explicit requirement, not an implementation detail."""
     arr = np.array([1.0, np.nan, np.nan, np.nan, np.nan, 6.0])  # gap of 4
     result = interpolate_gaps(arr, max_gap_frames=2)
     assert np.all(np.isnan(result[1:5]))
